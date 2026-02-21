@@ -1,38 +1,46 @@
 const DATA_ENTRY_SHEET_NAME = "Sheet1";
-const TIME_STAMP_COLUMN_NAME = "Timestamp";
+const SCRIPT_VERSION = "V6-DEBUG-TYPO-FIX";
 
 /**
- * Handles GET requests. Uses ScriptProperties for ultra-fast response.
+ * Handles GET requests: Availability & Version Check.
  */
 function doGet(e) {
   try {
+    // Version check
+    if (e.parameter.check === "version") {
+      return createJsonResponse({
+        status: "success",
+        version: SCRIPT_VERSION,
+        time: new Date().toLocaleTimeString(),
+        note: "Ensure access is set to ANYONE"
+      });
+    }
+
     const date = e.parameter.date;
     if (!date) return createJsonResponse({ status: "error", message: "Date required" });
 
-    // Use fast cache (Script Properties) instead of scanning the whole sheet for the UI
     const scriptProps = PropertiesService.getScriptProperties();
     const cacheKey = "booked_" + date;
-    const cachedSlotsStr = scriptProps.getProperty(cacheKey) || "";
+    let currentBookedSlotsStr = scriptProps.getProperty(cacheKey);
 
-    // If cache is empty, try to populate it once by scanning the sheet
-    if (!cachedSlotsStr) {
+    // If not in cache (first time or daily refresh), scan sheet
+    if (currentBookedSlotsStr === null) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
-      if (sheet) {
-        const booked = scanSheetForBookedSlots(date, sheet);
-        scriptProps.setProperty(cacheKey, booked.join(","));
-        return createJsonResponse({ status: "success", bookedSlots: booked });
-      }
+      const bookedArray = scanSheetForBookedSlots(date, sheet);
+      currentBookedSlotsStr = bookedArray.join(",");
+      scriptProps.setProperty(cacheKey, currentBookedSlotsStr);
     }
 
-    const bookedSlots = cachedSlotsStr.split(",").filter(s => s);
-    return createJsonResponse({ status: "success", bookedSlots: bookedSlots });
+    const bookedSlotsNormalized = currentBookedSlotsStr ? currentBookedSlotsStr.split(",") : [];
+    return createJsonResponse({ status: "success", bookedSlots: bookedSlotsNormalized });
+
   } catch (error) {
     return createJsonResponse({ status: "error", message: error.toString() });
   }
 }
 
 /**
- * Handles POST requests with "Double-Booking Prevention" in the fast cache.
+ * Handles POST requests: Double-Booking Prevention.
  */
 function doPost(e) {
   try {
@@ -40,74 +48,76 @@ function doPost(e) {
     const formData = JSON.parse(e.postData.contents || "{}");
 
     const date = formData.Select_Date;
-    const slotsString = formData["Select Time Slots (500 per hr)"] || "";
-    const requestedSlots = slotsString.split(",").map(s => s.trim()).filter(s => s);
+    const requestedSlotsStr = formData["Select Time Slots (500 per hr)"] || "";
+    const requestedSlotsArray = requestedSlotsStr.split(",").map(s => s.trim()).filter(s => s);
 
-    if (requestedSlots.length === 0) throw new Error("No slots selected");
+    if (requestedSlotsArray.length === 0) throw new Error("No slots selected");
 
-    // 1. FAST CHECK (Double Booking)
+    // Fast Double-Booking Check (Server-Side)
     const cacheKey = "booked_" + date;
-    const cachedSlotsStr = scriptProps.getProperty(cacheKey) || "";
-    const existingSlots = cachedSlotsStr.split(",").filter(s => s);
-    const conflicts = requestedSlots.filter(s => existingSlots.includes(s));
+    const currentCachedStr = scriptProps.getProperty(cacheKey) || "";
+    const alreadyBookedArray = currentCachedStr.split(",").filter(s => s);
+
+    // Check for overlap
+    const conflicts = requestedSlotsArray.filter(s => alreadyBookedArray.includes(s));
 
     if (conflicts.length > 0) {
       return createJsonResponse({
         status: "error",
-        message: "STILL ABLE TO BOOK? No! These slots were just taken: " + conflicts.join(", ")
+        message: "STILL ABLE TO BOOK? NO! These slots were literally JUST taken by someone else: " + conflicts.join(", ")
       });
     }
 
-    // 2. SHEET WRITE
+    // Prepare Sheet Mapping
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const headerMap = {};
     headers.forEach((h, i) => headerMap[h.toString().trim().toLowerCase()] = i);
 
-    const row = new Array(headers.length).fill("");
+    const rowToAppend = new Array(headers.length).fill("");
+
     Object.keys(formData).forEach(key => {
-      const normalizedKey = key.trim().toLowerCase();
-      if (headerMap.hasOwnProperty(normalizedKey)) {
-        row[headerMap[normalizedKey]] = formData[key];
+      const normKey = key.trim().toLowerCase();
+      if (headerMap.hasOwnProperty(normKey)) {
+        rowToAppend[headerMap[normKey]] = formData[key];
       } else {
-        // Fuzzy logic for User/Name
+        // Fuzzy map for User/Email/Mobile
         for (let h in headerMap) {
-          if (h.includes(normalizedKey) || normalizedKey.includes(h)) {
-            row[headerMap[h]] = formData[key];
+          if (h.includes(normKey) || normKey.includes(h)) {
+            rowToAppend[headerMap[h]] = formData[key];
             break;
           }
         }
       }
     });
 
-    if (headerMap.hasOwnProperty("timestamp")) row[headerMap["timestamp"]] = new Date().toLocaleString();
-    sheet.appendRow(row);
+    if (headerMap.hasOwnProperty("timestamp")) rowToAppend[headerMap["timestamp"]] = new Date().toLocaleString();
 
-    // 3. FAST UPDATE (Add to cache)
-    const updatedSlots = [...existingSlots, ...requestedSlots];
-    scriptProps.setProperty(cacheKey, updatedSlots.join(","));
+    // Write to Sheet
+    sheet.appendRow(rowToAppend);
 
-    return createJsonResponse({ status: "success", message: "Booking confirmed and synced!" });
+    // Update Counter (Global State)
+    const newBookedStr = [...alreadyBookedArray, ...requestedSlotsArray].join(",");
+    scriptProps.setProperty(cacheKey, newBookedStr);
+
+    return createJsonResponse({ status: "success", message: "Slot Confirmed and Synced!" });
+
   } catch (error) {
     return createJsonResponse({ status: "error", message: error.toString() });
   }
 }
 
 /**
- * Refresh trigger: Clears old data daily
+ * Triggered daily to clear cache
  */
 function dailyRefresh() {
   const scriptProps = PropertiesService.getScriptProperties();
-  const now = new Date();
-  const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-  const yesterdayStr = Utilities.formatDate(yesterday, Session.getScriptTimeZone(), "yyyy-MM-dd");
-
-  // Clear yesterday's cache key to keep properties clean
-  scriptProps.deleteProperty("booked_" + yesterdayStr);
-  Logger.log("Refreshed cache for " + yesterdayStr);
+  scriptProps.deleteAllProperties(); // Fresh start every day
+  Logger.log("Daily Refresh: Cleared all slot reservations.");
 }
 
 function scanSheetForBookedSlots(date, sheet) {
+  if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
 
@@ -119,17 +129,10 @@ function scanSheetForBookedSlots(date, sheet) {
 
   const bookedSlotsSet = new Set();
   for (let i = 1; i < data.length; i++) {
-    let rowDateStr = "";
-    if (data[i][dateIdx] instanceof Date) {
-      rowDateStr = Utilities.formatDate(data[i][dateIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
-    } else {
-      rowDateStr = data[i][dateIdx].toString().trim();
-    }
-
+    let rowDate = data[i][dateIdx];
+    let rowDateStr = (rowDate instanceof Date) ? Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy-MM-dd") : rowDate.toString().trim();
     if (rowDateStr === date) {
-      data[i][slotIdx].toString().split(",").map(s => s.trim()).forEach(s => {
-        if (s) bookedSlotsSet.add(s);
-      });
+      data[i][slotIdx].toString().split(",").map(s => s.trim()).forEach(s => { if (s) bookedSlotsSet.add(s); });
     }
   }
   return Array.from(bookedSlotsSet);
@@ -140,22 +143,8 @@ function createJsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * Run this function once manually in the editor to setup the daily refresh trigger.
- */
 function setupDailyRefreshTrigger() {
-  // Delete existing triggers for this function to avoid duplicates
   const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(t => {
-    if (t.getHandlerFunction() === 'dailyRefresh') ScriptApp.deleteTrigger(t);
-  });
-
-  // Create a new trigger for every midnight
-  ScriptApp.newTrigger('dailyRefresh')
-    .timeBased()
-    .atHour(0)
-    .everyDays(1)
-    .create();
-
-  Logger.log("Daily refresh trigger set successfully!");
+  triggers.forEach(t => { if (t.getHandlerFunction() === 'dailyRefresh') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('dailyRefresh').timeBased().atHour(0).everyDays(1).create();
 }
