@@ -91,6 +91,17 @@
       z-index: 10;
       border-radius: 6px;
     }
+
+    .debug-box {
+      font-family: monospace;
+      font-size: 0.8rem;
+      background: #fdfdfd;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      color: #333;
+    }
   </style>
 </head>
 
@@ -142,6 +153,8 @@
           <!-- Slots will be generated here by JavaScript -->
         </div>
         <input type="hidden" name="Select Time Slots (500 per hr)" id="selectedSlotsInput" required />
+        <button type="button" class="button is-small is-fullwidth mt-2" id="refreshSlotsBtn">Manual Refresh
+          Slots</button>
       </div>
 
       <hr />
@@ -189,6 +202,13 @@
     </form>
 
     <div id="message" class="notification mt-4" style="display: none"></div>
+
+    <!-- Troubleshooting Panel -->
+    <div class="mt-6 has-text-centered">
+      <h3 class="title is-5">Server Diagnostics</h3>
+      <button class="button is-small is-info is-outlined" id="checkScriptBtn">Verify Connection & Version</button>
+      <div id="debugLog" class="debug-box" style="display:none"></div>
+    </div>
   </div>
 
   <script>
@@ -201,9 +221,12 @@
     const bookingDateInput = document.getElementById("bookingDate");
     const resetButton = document.getElementById("resetButton");
     const slotLoadingOverlay = document.getElementById("slotLoadingOverlay");
+    const debugLog = document.getElementById("debugLog");
+    const checkScriptBtn = document.getElementById("checkScriptBtn");
+    const refreshSlotsBtn = document.getElementById("refreshSlotsBtn");
 
     const PRICE_PER_SLOT = 500;
-    // UPDATE THIS URL IF YOU RE-DEPLOY YOUR SCRIPT!
+    // IMPORTANT: After you deploy as "Anyone", paste the NEW URL here:
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsoC4odNCzDDRRCqbb0JAQnFQ_7dHoWDSIAswkdesdDwQGaXU-meu6_wQvKLMEkDkDeg/exec";
 
     let selectedSlots = [];
@@ -230,12 +253,15 @@
       { label: "10 PM - 11 PM", start: 22 }, { label: "11 PM - 12 AM", start: 23 }
     ];
 
-    bookingDateInput.addEventListener("change", async () => {
+    bookingDateInput.addEventListener("change", fetchAndRender);
+    refreshSlotsBtn.addEventListener("click", fetchAndRender);
+
+    async function fetchAndRender() {
       selectedSlots = [];
       await fetchAvailability();
       renderSlots();
       updateTotals();
-    });
+    }
 
     async function fetchAvailability() {
       const selectedDate = bookingDateInput.value;
@@ -243,29 +269,55 @@
 
       slotLoadingOverlay.style.display = "flex";
       try {
-        // Use redirect 'follow' explicitly and bust cache
-        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}&t=${Date.now()}`, {
+        // Simple fetch without cache-busting timestamp to avoid preflight issues?
+        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}`, {
           method: 'GET',
-          redirect: 'follow', // Vital for GAS
+          redirect: 'follow', // Required for GAS
         });
 
-        if (!response.ok) throw new Error("Server responded with error");
+        if (!response.ok) throw new Error("Server Status: " + response.status);
 
         const data = await response.json();
         if (data.status === "success") {
           bookedSlots = data.bookedSlots || [];
         } else {
-          console.warn("Server Error:", data.message);
+          logDebug("Server Error: " + data.message);
         }
       } catch (error) {
-        console.error("Availability check failed:", error);
-        // Hint for CORS origin null issue
-        if (window.location.protocol === 'file:') {
-          showNotification("CORS Error: Please use a local server (Live Server) or host on Netlify.", "is-warning");
-        }
+        console.error("Availability error:", error);
+        logDebug("Fetch Error (Likely CORS): " + error.message);
       } finally {
         slotLoadingOverlay.style.display = "none";
       }
+    }
+
+    checkScriptBtn.addEventListener("click", async () => {
+      checkScriptBtn.classList.add("is-loading");
+      debugLog.style.display = "block";
+      logDebug("TESTING CONNECTION TO: " + SCRIPT_URL);
+
+      try {
+        const res = await fetch(`${SCRIPT_URL}?check=version`, {
+          method: 'GET',
+          redirect: 'follow'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          logDebug("SUCCESS! Server Version: " + data.version);
+        } else {
+          logDebug("FAILED! HTTP Status: " + res.status);
+        }
+      } catch (e) {
+        logDebug("ERROR: " + e.message);
+        logDebug("\nPLEASE CHECK:\n1. Did you Deploy as 'Anyone'?\n2. Is the URL correct?");
+      } finally {
+        checkScriptBtn.classList.remove("is-loading");
+      }
+    });
+
+    function logDebug(msg) {
+      debugLog.textContent += "\n[" + new Date().toLocaleTimeString() + "] " + msg;
     }
 
     function renderSlots() {
@@ -338,42 +390,34 @@
 
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
-
       if (selectedSlots.length === 0) {
         showNotification("Please select at least one slot", "is-warning");
         return;
       }
 
       showLoading(true);
-
       try {
         const formData = new FormData(this);
         const formDataObj = Object.fromEntries(formData.entries());
-
-        console.log("Submitting payload:", formDataObj);
 
         const response = await fetch(SCRIPT_URL, {
           redirect: "follow",
           method: "POST",
           body: JSON.stringify(formDataObj),
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8",
-          },
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
         });
 
         const data = await response.json();
 
         if (data.status === "success") {
-          showNotification("Slot booking submitted successfully!", "is-success");
+          showNotification("Booking Confirmed!", "is-success");
           setTimeout(() => resetForm(), 2000);
         } else {
-          // This handles the server-side double booking error
           throw new Error(data.message || "Booking failed");
         }
       } catch (error) {
         console.error("Submission failed:", error);
         showNotification("Error: " + error.message, "is-danger");
-        // Re-fetch availability in case it was a double booking error
         fetchAvailability().then(() => renderSlots());
       } finally {
         showLoading(false);
@@ -384,8 +428,6 @@
       messageDiv.textContent = text;
       messageDiv.className = `notification mt-4 ${type}`;
       messageDiv.style.display = "block";
-
-      // Don't auto-hide error messages so user can read them
       if (type !== 'is-danger') {
         setTimeout(() => {
           if (messageDiv.textContent === text) messageDiv.style.display = "none";
