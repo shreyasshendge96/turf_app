@@ -2,17 +2,29 @@ const DATA_ENTRY_SHEET_NAME = "Sheet1";
 const TIME_STAMP_COLUMN_NAME = "Timestamp";
 
 /**
- * Handles GET requests to fetch already booked slots for a given date.
+ * Handles GET requests. Uses ScriptProperties for ultra-fast response.
  */
 function doGet(e) {
   try {
     const date = e.parameter.date;
     if (!date) return createJsonResponse({ status: "error", message: "Date required" });
 
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
-    if (!sheet) return createJsonResponse({ status: "error", message: "Sheet not found" });
+    // Use fast cache (Script Properties) instead of scanning the whole sheet for the UI
+    const scriptProps = PropertiesService.getScriptProperties();
+    const cacheKey = "booked_" + date;
+    const cachedSlotsStr = scriptProps.getProperty(cacheKey) || "";
 
-    const bookedSlots = getBookedSlotsForDate(date, sheet);
+    // If cache is empty, try to populate it once by scanning the sheet
+    if (!cachedSlotsStr) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
+      if (sheet) {
+        const booked = scanSheetForBookedSlots(date, sheet);
+        scriptProps.setProperty(cacheKey, booked.join(","));
+        return createJsonResponse({ status: "success", bookedSlots: booked });
+      }
+    }
+
+    const bookedSlots = cachedSlotsStr.split(",").filter(s => s);
     return createJsonResponse({ status: "success", bookedSlots: bookedSlots });
   } catch (error) {
     return createJsonResponse({ status: "error", message: error.toString() });
@@ -20,77 +32,82 @@ function doGet(e) {
 }
 
 /**
- * Handles POST requests for new bookings with double-booking prevention.
+ * Handles POST requests with "Double-Booking Prevention" in the fast cache.
  */
 function doPost(e) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
-    if (!sheet) throw new Error(`Sheet '${DATA_ENTRY_SHEET_NAME}' not found`);
-
+    const scriptProps = PropertiesService.getScriptProperties();
     const formData = JSON.parse(e.postData.contents || "{}");
 
-    // 1. Validate Double Booking
     const date = formData.Select_Date;
     const slotsString = formData["Select Time Slots (500 per hr)"] || "";
     const requestedSlots = slotsString.split(",").map(s => s.trim()).filter(s => s);
 
     if (requestedSlots.length === 0) throw new Error("No slots selected");
 
-    const existingSlots = getBookedSlotsForDate(date, sheet);
+    // 1. FAST CHECK (Double Booking)
+    const cacheKey = "booked_" + date;
+    const cachedSlotsStr = scriptProps.getProperty(cacheKey) || "";
+    const existingSlots = cachedSlotsStr.split(",").filter(s => s);
     const conflicts = requestedSlots.filter(s => existingSlots.includes(s));
 
     if (conflicts.length > 0) {
       return createJsonResponse({
         status: "error",
-        message: "Double booking detected! These slots are already taken: " + conflicts.join(", ")
+        message: "STILL ABLE TO BOOK? No! These slots were just taken: " + conflicts.join(", ")
       });
     }
 
-    // 2. Prepare Data Mapping
+    // 2. SHEET WRITE
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const headerMap = {};
-    headers.forEach((header, index) => {
-      headerMap[header.toString().trim().toLowerCase()] = index;
-    });
+    headers.forEach((h, i) => headerMap[h.toString().trim().toLowerCase()] = i);
 
     const row = new Array(headers.length).fill("");
-
-    // 3. Robust Fuzzy Mapping
     Object.keys(formData).forEach(key => {
       const normalizedKey = key.trim().toLowerCase();
-
-      // Exact match first
       if (headerMap.hasOwnProperty(normalizedKey)) {
         row[headerMap[normalizedKey]] = formData[key];
       } else {
-        // Fallback fuzzy search (e.g. "mobile" matches "mobile_number")
-        for (let header in headerMap) {
-          if (header.includes(normalizedKey) || normalizedKey.includes(header)) {
-            row[headerMap[header]] = formData[key];
+        // Fuzzy logic for User/Name
+        for (let h in headerMap) {
+          if (h.includes(normalizedKey) || normalizedKey.includes(h)) {
+            row[headerMap[h]] = formData[key];
             break;
           }
         }
       }
     });
 
-    // Add Timestamp if column exists
-    if (headerMap.hasOwnProperty("timestamp")) {
-      row[headerMap["timestamp"]] = new Date().toLocaleString();
-    }
-
-    // 4. Final Submission
+    if (headerMap.hasOwnProperty("timestamp")) row[headerMap["timestamp"]] = new Date().toLocaleString();
     sheet.appendRow(row);
 
-    return createJsonResponse({ status: "success", message: "Booking confirmed!" });
+    // 3. FAST UPDATE (Add to cache)
+    const updatedSlots = [...existingSlots, ...requestedSlots];
+    scriptProps.setProperty(cacheKey, updatedSlots.join(","));
+
+    return createJsonResponse({ status: "success", message: "Booking confirmed and synced!" });
   } catch (error) {
     return createJsonResponse({ status: "error", message: error.toString() });
   }
 }
 
 /**
- * Finds all booked slots for a specific date in the sheet.
+ * Refresh trigger: Clears old data daily
  */
-function getBookedSlotsForDate(date, sheet) {
+function dailyRefresh() {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+  const yesterdayStr = Utilities.formatDate(yesterday, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  // Clear yesterday's cache key to keep properties clean
+  scriptProps.deleteProperty("booked_" + yesterdayStr);
+  Logger.log("Refreshed cache for " + yesterdayStr);
+}
+
+function scanSheetForBookedSlots(date, sheet) {
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
 
@@ -102,18 +119,15 @@ function getBookedSlotsForDate(date, sheet) {
 
   const bookedSlotsSet = new Set();
   for (let i = 1; i < data.length; i++) {
-    let rowDate = data[i][dateIdx];
     let rowDateStr = "";
-
-    if (rowDate instanceof Date) {
-      rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    if (data[i][dateIdx] instanceof Date) {
+      rowDateStr = Utilities.formatDate(data[i][dateIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
     } else {
-      rowDateStr = rowDate.toString().trim();
+      rowDateStr = data[i][dateIdx].toString().trim();
     }
 
     if (rowDateStr === date) {
-      const slotsRaw = data[i][slotIdx].toString();
-      slotsRaw.split(",").map(s => s.trim()).forEach(s => {
+      data[i][slotIdx].toString().split(",").map(s => s.trim()).forEach(s => {
         if (s) bookedSlotsSet.add(s);
       });
     }
@@ -127,18 +141,21 @@ function createJsonResponse(obj) {
 }
 
 /**
- * Troubleshooting function: Check sheet connection
+ * Run this function once manually in the editor to setup the daily refresh trigger.
  */
-function testConnection() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
-  if (!sheet) {
-    Logger.log("ERROR: Sheet '" + DATA_ENTRY_SHEET_NAME + "' not found!");
-  } else {
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    Logger.log("SUCCESS: Linked to sheet.");
-    Logger.log("Columns found: " + headers.join(" | "));
+function setupDailyRefreshTrigger() {
+  // Delete existing triggers for this function to avoid duplicates
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === 'dailyRefresh') ScriptApp.deleteTrigger(t);
+  });
 
-    // Log normalized keys the script expects
-    Logger.log("Mapped Keys: " + headers.map(h => h.toString().trim().toLowerCase()).join(", "));
-  }
+  // Create a new trigger for every midnight
+  ScriptApp.newTrigger('dailyRefresh')
+    .timeBased()
+    .atHour(0)
+    .everyDays(1)
+    .create();
+
+  Logger.log("Daily refresh trigger set successfully!");
 }
