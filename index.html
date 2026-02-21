@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+  <title>Turf Slot Booking</title>
+  <style>
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .slot-btn {
+      border: 1px solid #dbdbdb;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      background-color: white;
+      user-select: none;
+      font-size: 0.9rem;
+      position: relative;
+    }
+
+    .slot-btn:hover:not(.is-disabled):not(.is-booked) {
+      border-color: #48c78e;
+      background-color: #f9fffb;
+    }
+
+    .slot-btn.is-selected {
+      background-color: #48c78e;
+      color: white;
+      border-color: #38b37a;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(72, 199, 142, 0.3);
+    }
+
+    .slot-btn.is-disabled {
+      background-color: #f5f5f5;
+      color: #b5b5b5;
+      border-color: #eeeeee;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .slot-btn.is-booked {
+      background-color: #ffdce0;
+      color: #f14668;
+      border-color: #f14668;
+      cursor: not-allowed;
+      opacity: 0.8;
+      font-weight: bold;
+    }
+
+    .slot-btn.is-booked::after {
+      content: "Booked";
+      display: block;
+      font-size: 0.7rem;
+      margin-top: 2px;
+    }
+
+    .form-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .hero.is-primary {
+      background-color: #2b7a56;
+    }
+
+    .shadow {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <section class="hero is-primary is-bold">
+    <div class="hero-body">
+      <div class="container has-text-centered">
+        <h1 class="title">Turf Slot Booking</h1>
+        <p class="subtitle">Book your game in minutes</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="form-container">
+    <form id="form" class="box shadow">
+      <div class="columns">
+        <div class="column is-6">
+          <div class="field">
+            <label class="label">Name</label>
+            <div class="control">
+              <input class="input" type="text" placeholder="Enter your name" name="Name" id="inputName" required />
+            </div>
+          </div>
+        </div>
+        <div class="column is-6">
+          <div class="field">
+            <label class="label">Mobile_Number</label>
+            <div class="control">
+              <input class="input" type="tel" placeholder="10 digit mobile number" name="Mobile_Number"
+                pattern="[0-9]{10}" required />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Select_Date</label>
+        <div class="control">
+          <input class="input" type="date" name="Select_Date" id="bookingDate" required />
+        </div>
+      </div>
+
+      <div class="field" style="position: relative;">
+        <label class="label">Select Time Slots (500 per hr)</label>
+        <div id="slotLoadingOverlay" class="loading-overlay" style="display: none;">
+          <div class="button is-loading is-white">Searching...</div>
+        </div>
+        <div class="slot-grid" id="slotGrid">
+          <!-- Slots will be generated here by JavaScript -->
+        </div>
+        <input type="hidden" name="Select Time Slots (500 per hr)" id="selectedSlotsInput" required />
+      </div>
+
+      <hr />
+
+      <div class="columns is-vcentered">
+        <div class="column">
+          <div class="field">
+            <label class="label">Total_Amount</label>
+            <div class="control">
+              <input class="input is-static is-size-4 has-text-weight-bold" type="text" name="Total_Amount"
+                id="amountDisplay" value="0" readonly />
+            </div>
+          </div>
+        </div>
+        <div class="column">
+          <div class="field">
+            <label class="label">Transaction_ID</label>
+            <div class="control">
+              <input class="input" type="text" placeholder="Placeholder" name="Transaction_ID" readonly />
+            </div>
+          </div>
+        </div>
+        <div class="column">
+          <div class="field">
+            <label class="label">Payment_Status</label>
+            <div class="control">
+              <input class="input" type="text" placeholder="Pending" name="Payment_Status" value="Pending" readonly />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field is-grouped is-grouped-centered mt-5">
+        <div class="control">
+          <button class="button is-success is-large" type="submit" id="submit-button">
+            Book Now
+          </button>
+        </div>
+        <div class="control">
+          <button class="button is-light is-large" type="button" id="resetButton">
+            Reset
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div id="message" class="notification mt-4" style="display: none"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const submitButton = document.getElementById("submit-button");
+    const messageDiv = document.getElementById("message");
+    const slotGrid = document.getElementById("slotGrid");
+    const amountDisplay = document.getElementById("amountDisplay");
+    const selectedSlotsInput = document.getElementById("selectedSlotsInput");
+    const bookingDateInput = document.getElementById("bookingDate");
+    const resetButton = document.getElementById("resetButton");
+    const slotLoadingOverlay = document.getElementById("slotLoadingOverlay");
+
+    const PRICE_PER_SLOT = 500;
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsoC4odNCzDDRRCqbb0JAQnFQ_7dHoWDSIAswkdesdDwQGaXU-meu6_wQvKLMEkDkDeg/exec";
+
+    let selectedSlots = [];
+    let bookedSlots = [];
+
+    // Set min date to today
+    const today = new Date().toISOString().split("T")[0];
+    bookingDateInput.setAttribute("min", today);
+    bookingDateInput.value = today;
+
+    const slotsData = [
+      { label: "12 AM - 01 AM", start: 0 },
+      { label: "01 AM - 02 AM", start: 1 },
+      { label: "02 AM - 03 AM", start: 2 },
+      { label: "03 AM - 04 AM", start: 3 },
+      { label: "04 AM - 05 AM", start: 4 },
+      { label: "05 AM - 06 AM", start: 5 },
+      { label: "06 AM - 07 AM", start: 6 },
+      { label: "07 AM - 08 AM", start: 7 },
+      { label: "08 AM - 09 AM", start: 8 },
+      { label: "09 AM - 10 AM", start: 9 },
+      { label: "10 AM - 11 AM", start: 10 },
+      { label: "11 AM - 12 PM", start: 11 },
+      { label: "12 PM - 01 PM", start: 12 },
+      { label: "01 PM - 02 PM", start: 13 },
+      { label: "02 PM - 03 PM", start: 14 },
+      { label: "03 PM - 04 PM", start: 15 },
+      { label: "04 PM - 05 PM", start: 16 },
+      { label: "05 PM - 06 PM", start: 17 },
+      { label: "06 PM - 07 PM", start: 18 },
+      { label: "07 PM - 08 PM", start: 19 },
+      { label: "08 PM - 09 PM", start: 20 },
+      { label: "09 PM - 10 PM", start: 21 },
+      { label: "10 PM - 11 PM", start: 22 },
+      { label: "11 PM - 12 AM", start: 23 }
+    ];
+
+    bookingDateInput.addEventListener("change", async () => {
+      selectedSlots = [];
+      await fetchAvailability();
+      renderSlots();
+      updateTotals();
+    });
+
+    async function fetchAvailability() {
+      const selectedDate = bookingDateInput.value;
+      if (!selectedDate) return;
+
+      slotLoadingOverlay.style.display = "flex";
+      try {
+        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}&t=${Date.now()}`);
+        const data = await response.json();
+        if (data.status === "success") {
+          bookedSlots = data.bookedSlots || [];
+        }
+      } catch (error) {
+        console.error("Availability check failed:", error);
+      } finally {
+        slotLoadingOverlay.style.display = "none";
+      }
+    }
+
+    function renderSlots() {
+      slotGrid.innerHTML = "";
+      const selectedDate = bookingDateInput.value;
+      const now = new Date();
+      const currentHour = now.getHours();
+      const isToday = selectedDate === today;
+
+      slotsData.forEach(slot => {
+        const btn = document.createElement("div");
+        const isPast = isToday && slot.start <= currentHour;
+        const isAlreadyBooked = bookedSlots.includes(slot.label);
+
+        btn.className = "slot-btn";
+        if (isPast) btn.classList.add("is-disabled");
+        if (isAlreadyBooked) btn.classList.add("is-booked");
+
+        btn.textContent = slot.label;
+
+        if (!isPast && !isAlreadyBooked) {
+          btn.addEventListener("click", () => toggleSlot(slot.label, btn));
+        }
+
+        slotGrid.appendChild(btn);
+      });
+    }
+
+    function toggleSlot(slotLabel, btn) {
+      if (selectedSlots.includes(slotLabel)) {
+        selectedSlots = selectedSlots.filter(s => s !== slotLabel);
+        btn.classList.remove("is-selected");
+      } else {
+        selectedSlots.push(slotLabel);
+        btn.classList.add("is-selected");
+      }
+      updateTotals();
+    }
+
+    function updateTotals() {
+      const totalAmount = selectedSlots.length * PRICE_PER_SLOT;
+      amountDisplay.value = totalAmount;
+      selectedSlotsInput.value = selectedSlots.join(", ");
+
+      if (selectedSlots.length === 0) {
+        selectedSlotsInput.setCustomValidity("Please select at least one slot");
+      } else {
+        selectedSlotsInput.setCustomValidity("");
+      }
+    }
+
+    async function resetForm() {
+      form.reset();
+      selectedSlots = [];
+      messageDiv.style.display = "none";
+      bookingDateInput.value = today;
+      await fetchAvailability();
+      renderSlots();
+      updateTotals();
+    }
+
+    resetButton.addEventListener("click", resetForm);
+
+    (async () => {
+      await fetchAvailability();
+      renderSlots();
+      updateTotals();
+    })();
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      if (selectedSlots.length === 0) {
+        showNotification("Please select at least one slot", "is-warning");
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const formDataObj = Object.fromEntries(new FormData(this));
+
+        // Debugging logs - Open browser console (F12) to see this
+        console.log("Submitting payload:", formDataObj);
+
+        const response = await fetch(SCRIPT_URL, {
+          redirect: "follow",
+          method: "POST",
+          body: JSON.stringify(formDataObj),
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8",
+          },
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+          showNotification("Slot booking submitted successfully!", "is-success");
+          setTimeout(() => resetForm(), 2000);
+        } else {
+          throw new Error(data.message || "Booking failed");
+        }
+      } catch (error) {
+        console.error("Submission failed:", error);
+        showNotification("Error: " + error.message, "is-danger");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    function showNotification(text, type) {
+      messageDiv.textContent = text;
+      messageDiv.className = `notification mt-4 ${type}`;
+      messageDiv.style.display = "block";
+
+      setTimeout(() => {
+        messageDiv.style.display = "none";
+      }, 5000);
+    }
+
+    function showLoading(isLoading) {
+      if (isLoading) {
+        submitButton.disabled = true;
+        submitButton.classList.add("is-loading");
+      } else {
+        submitButton.disabled = false;
+        submitButton.classList.remove("is-loading");
+      }
+    }
+  </script>
+</body>
+
+</html>
