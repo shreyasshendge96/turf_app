@@ -203,41 +203,31 @@
     const slotLoadingOverlay = document.getElementById("slotLoadingOverlay");
 
     const PRICE_PER_SLOT = 500;
+    // UPDATE THIS URL IF YOU RE-DEPLOY YOUR SCRIPT!
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsoC4odNCzDDRRCqbb0JAQnFQ_7dHoWDSIAswkdesdDwQGaXU-meu6_wQvKLMEkDkDeg/exec";
 
     let selectedSlots = [];
     let bookedSlots = [];
 
     // Set min date to today
-    const today = new Date().toISOString().split("T")[0];
-    bookingDateInput.setAttribute("min", today);
-    bookingDateInput.value = today;
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    bookingDateInput.setAttribute("min", todayStr);
+    bookingDateInput.value = todayStr;
 
     const slotsData = [
-      { label: "12 AM - 01 AM", start: 0 },
-      { label: "01 AM - 02 AM", start: 1 },
-      { label: "02 AM - 03 AM", start: 2 },
-      { label: "03 AM - 04 AM", start: 3 },
-      { label: "04 AM - 05 AM", start: 4 },
-      { label: "05 AM - 06 AM", start: 5 },
-      { label: "06 AM - 07 AM", start: 6 },
-      { label: "07 AM - 08 AM", start: 7 },
-      { label: "08 AM - 09 AM", start: 8 },
-      { label: "09 AM - 10 AM", start: 9 },
-      { label: "10 AM - 11 AM", start: 10 },
-      { label: "11 AM - 12 PM", start: 11 },
-      { label: "12 PM - 01 PM", start: 12 },
-      { label: "01 PM - 02 PM", start: 13 },
-      { label: "02 PM - 03 PM", start: 14 },
-      { label: "03 PM - 04 PM", start: 15 },
-      { label: "04 PM - 05 PM", start: 16 },
-      { label: "05 PM - 06 PM", start: 17 },
-      { label: "06 PM - 07 PM", start: 18 },
-      { label: "07 PM - 08 PM", start: 19 },
-      { label: "08 PM - 09 PM", start: 20 },
-      { label: "09 PM - 10 PM", start: 21 },
-      { label: "10 PM - 11 PM", start: 22 },
-      { label: "11 PM - 12 AM", start: 23 }
+      { label: "12 AM - 01 AM", start: 0 }, { label: "01 AM - 02 AM", start: 1 },
+      { label: "02 AM - 03 AM", start: 2 }, { label: "03 AM - 04 AM", start: 3 },
+      { label: "04 AM - 05 AM", start: 4 }, { label: "05 AM - 06 AM", start: 5 },
+      { label: "06 AM - 07 AM", start: 6 }, { label: "07 AM - 08 AM", start: 7 },
+      { label: "08 AM - 09 AM", start: 8 }, { label: "09 AM - 10 AM", start: 9 },
+      { label: "10 AM - 11 AM", start: 10 }, { label: "11 AM - 12 PM", start: 11 },
+      { label: "12 PM - 01 PM", start: 12 }, { label: "01 PM - 02 PM", start: 13 },
+      { label: "02 PM - 03 PM", start: 14 }, { label: "03 PM - 04 PM", start: 15 },
+      { label: "04 PM - 05 PM", start: 16 }, { label: "05 PM - 06 PM", start: 17 },
+      { label: "06 PM - 07 PM", start: 18 }, { label: "07 PM - 08 PM", start: 19 },
+      { label: "08 PM - 09 PM", start: 20 }, { label: "09 PM - 10 PM", start: 21 },
+      { label: "10 PM - 11 PM", start: 22 }, { label: "11 PM - 12 AM", start: 23 }
     ];
 
     bookingDateInput.addEventListener("change", async () => {
@@ -253,13 +243,26 @@
 
       slotLoadingOverlay.style.display = "flex";
       try {
-        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}&t=${Date.now()}`);
+        // Use redirect 'follow' explicitly and bust cache
+        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}&t=${Date.now()}`, {
+          method: 'GET',
+          redirect: 'follow', // Vital for GAS
+        });
+
+        if (!response.ok) throw new Error("Server responded with error");
+
         const data = await response.json();
         if (data.status === "success") {
           bookedSlots = data.bookedSlots || [];
+        } else {
+          console.warn("Server Error:", data.message);
         }
       } catch (error) {
         console.error("Availability check failed:", error);
+        // Hint for CORS origin null issue
+        if (window.location.protocol === 'file:') {
+          showNotification("CORS Error: Please use a local server (Live Server) or host on Netlify.", "is-warning");
+        }
       } finally {
         slotLoadingOverlay.style.display = "none";
       }
@@ -270,7 +273,7 @@
       const selectedDate = bookingDateInput.value;
       const now = new Date();
       const currentHour = now.getHours();
-      const isToday = selectedDate === today;
+      const isToday = selectedDate === todayStr;
 
       slotsData.forEach(slot => {
         const btn = document.createElement("div");
@@ -318,7 +321,7 @@
       form.reset();
       selectedSlots = [];
       messageDiv.style.display = "none";
-      bookingDateInput.value = today;
+      bookingDateInput.value = todayStr;
       await fetchAvailability();
       renderSlots();
       updateTotals();
@@ -326,6 +329,7 @@
 
     resetButton.addEventListener("click", resetForm);
 
+    // Initial load
     (async () => {
       await fetchAvailability();
       renderSlots();
@@ -343,9 +347,9 @@
       showLoading(true);
 
       try {
-        const formDataObj = Object.fromEntries(new FormData(this));
+        const formData = new FormData(this);
+        const formDataObj = Object.fromEntries(formData.entries());
 
-        // Debugging logs - Open browser console (F12) to see this
         console.log("Submitting payload:", formDataObj);
 
         const response = await fetch(SCRIPT_URL, {
@@ -363,11 +367,14 @@
           showNotification("Slot booking submitted successfully!", "is-success");
           setTimeout(() => resetForm(), 2000);
         } else {
+          // This handles the server-side double booking error
           throw new Error(data.message || "Booking failed");
         }
       } catch (error) {
         console.error("Submission failed:", error);
         showNotification("Error: " + error.message, "is-danger");
+        // Re-fetch availability in case it was a double booking error
+        fetchAvailability().then(() => renderSlots());
       } finally {
         showLoading(false);
       }
@@ -378,9 +385,12 @@
       messageDiv.className = `notification mt-4 ${type}`;
       messageDiv.style.display = "block";
 
-      setTimeout(() => {
-        messageDiv.style.display = "none";
-      }, 5000);
+      // Don't auto-hide error messages so user can read them
+      if (type !== 'is-danger') {
+        setTimeout(() => {
+          if (messageDiv.textContent === text) messageDiv.style.display = "none";
+        }, 5000);
+      }
     }
 
     function showLoading(isLoading) {
