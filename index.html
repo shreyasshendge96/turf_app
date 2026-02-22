@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
   <title>Turf Slot Booking</title>
+  <!-- Razorpay Checkout JS -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     .slot-grid {
       display: grid;
@@ -103,11 +105,6 @@
       color: #333;
       text-align: left;
     }
-
-    .error-tag {
-      color: #f14668;
-      font-weight: bold;
-    }
   </style>
 </head>
 
@@ -136,7 +133,7 @@
           <div class="field">
             <label class="label">Mobile_Number</label>
             <div class="control">
-              <input class="input" type="tel" placeholder="10 digit mobile number" name="Mobile_Number"
+              <input class="input" type="tel" placeholder="10 digit mobile number" name="Mobile_Number" id="inputMobile"
                 pattern="[0-9]{10}" required />
             </div>
           </div>
@@ -168,7 +165,7 @@
       <div class="columns is-vcentered">
         <div class="column">
           <div class="field">
-            <label class="label">Total_Amount</label>
+            <label class="label">Total_Amount (₹)</label>
             <div class="control">
               <input class="input is-static is-size-4 has-text-weight-bold" type="text" name="Total_Amount"
                 id="amountDisplay" value="0" readonly />
@@ -179,7 +176,8 @@
           <div class="field">
             <label class="label">Transaction_ID</label>
             <div class="control">
-              <input class="input" type="text" placeholder="Placeholder" name="Transaction_ID" readonly />
+              <input class="input" type="text" placeholder="Generated after payment" name="Transaction_ID"
+                id="inputTransactionId" readonly />
             </div>
           </div>
         </div>
@@ -187,7 +185,8 @@
           <div class="field">
             <label class="label">Payment_Status</label>
             <div class="control">
-              <input class="input" type="text" placeholder="Pending" name="Payment_Status" value="Pending" readonly />
+              <input class="input" type="text" placeholder="Pending" name="Payment_Status" id="inputPaymentStatus"
+                value="Pending" readonly />
             </div>
           </div>
         </div>
@@ -196,7 +195,7 @@
       <div class="field is-grouped is-grouped-centered mt-5">
         <div class="control">
           <button class="button is-success is-large" type="submit" id="submit-button">
-            Book Now
+            Proceed to Payment
           </button>
         </div>
         <div class="control">
@@ -209,16 +208,14 @@
 
     <div id="message" class="notification mt-4" style="display: none"></div>
 
-    <!-- Troubleshooting Panel -->
-    <div class="mt-6 box shadow">
-      <h3 class="title is-5 has-text-centered">Server Diagnostics</h3>
-      <div class="has-text-centered mb-4">
-        <button class="button is-small is-info" id="checkScriptBtn">Run Diagnostics</button>
-        <button class="button is-small is-light" id="openScriptBtn">Open Script Status Directly</button>
+    <!-- Troubleshooting Tools -->
+    <div class="mt-6 has-text-centered">
+      <h3 class="title is-5">Server Diagnostics</h3>
+      <div class="buttons is-centered">
+        <button class="button is-small is-info is-outlined" id="checkScriptBtn">Verify Connection</button>
+        <button class="button is-small is-light" id="openScriptBtn">Direct Status Check</button>
       </div>
-      <div id="debugLog" class="debug-box" style="display:none">
-        <p><strong>System Log:</strong></p>
-      </div>
+      <div id="debugLog" class="debug-box" style="display:none"></div>
     </div>
   </div>
 
@@ -238,8 +235,8 @@
     const openScriptBtn = document.getElementById("openScriptBtn");
 
     const PRICE_PER_SLOT = 500;
-    // CRITICAL: Update this URL after every "New Deployment"
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyJNHdO0WNk4ja_jnlFJG93hLdjRl8XBkZ3VXhqBbXKTUiLebvvyR9qH3ukwstPCfPvoQ/exec";
+    // UPDATE THIS URL AFTER EVERY NEW DEPLOYMENT (Select 'Anyone' access)
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwruQ3cBV42aCTiQaeflM8lW_7mE258cnaho_uDw70t8XEntBHMOZR99HTsaxLFHgOGDw/exec";
 
     let selectedSlots = [];
     let bookedSlots = [];
@@ -269,7 +266,6 @@
     refreshSlotsBtn.addEventListener("click", fetchAndRender);
     openScriptBtn.addEventListener("click", () => {
       window.open(`${SCRIPT_URL}?check=version`, '_blank');
-      logDebug("Opened script version check in new tab. If it asks you to sign in, YOUR DEPLOYMENT IS WRONG.");
     });
 
     async function fetchAndRender() {
@@ -290,7 +286,7 @@
           redirect: 'follow',
         });
 
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        if (!response.ok) throw new Error("Server Status: " + response.status);
 
         const data = await response.json();
         if (data.status === "success") {
@@ -310,43 +306,20 @@
     checkScriptBtn.addEventListener("click", async () => {
       checkScriptBtn.classList.add("is-loading");
       debugLog.style.display = "block";
-      logDebug("DEEP DIAGNOSTIC STARTING...");
-      logDebug("TARGET URL: " + SCRIPT_URL);
-
+      logDebug("Testing connection to: " + SCRIPT_URL);
       try {
-        logDebug("Step 1: Pinging script...");
-        const res = await fetch(`${SCRIPT_URL}?check=version`, {
-          method: 'GET',
-          redirect: 'follow'
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          logDebug("SUCCESS! Connection established.");
-          logDebug("Server Version: " + data.version);
-          logDebug("Server Time: " + data.time);
-          logDebug("Message: " + data.note);
-        } else {
-          logDebug("FAILED! Server returned status " + res.status);
-          if (res.status === 401 || res.status === 403) {
-            logDebug("CRITICAL: Access Denied. Check 'Anyone' permissions.");
-          }
-        }
+        const res = await fetch(`${SCRIPT_URL}?check=version`, { redirect: 'follow' });
+        const data = await res.json();
+        logDebug("SUCCESS! Version: " + data.version + " | Time: " + data.time);
       } catch (e) {
-        logDebug("ERROR: " + e.message);
-        logDebug("\n--- TROUBLESHOOTING GUIDE ---");
-        logDebug("1. Open the 'Script Status' button above. Does it work?");
-        logDebug("2. If it asks to LOG IN, your deployment is 'Who has access: Only Me'");
-        logDebug("3. You MUST re-deploy and select ANYONE.");
+        logDebug("CRITICAL ERROR: " + e.message);
       } finally {
         checkScriptBtn.classList.remove("is-loading");
       }
     });
 
     function logDebug(msg) {
-      const p = document.createElement("p");
-      p.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      debugLog.appendChild(p);
+      debugLog.textContent += "\n[" + new Date().toLocaleTimeString() + "] " + msg;
     }
 
     function renderSlots() {
@@ -389,12 +362,6 @@
       const count = selectedSlots.length;
       amountDisplay.value = count * PRICE_PER_SLOT;
       selectedSlotsInput.value = selectedSlots.join(", ");
-
-      if (count === 0) {
-        selectedSlotsInput.setCustomValidity("Please select at least one slot");
-      } else {
-        selectedSlotsInput.setCustomValidity("");
-      }
     }
 
     async function resetForm() {
@@ -415,34 +382,95 @@
       updateTotals();
     })();
 
+    // RAZORPAY INTEGRATION LOGIC
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
       if (selectedSlots.length === 0) {
-        showNotification("Please select a slot", "is-warning");
+        showNotification("Please select at least one slot", "is-warning");
         return;
       }
 
       showLoading(true);
+
       try {
         const formDataObj = Object.fromEntries(new FormData(this));
-        const res = await fetch(SCRIPT_URL, {
+        const amountInPaise = parseInt(formDataObj.Total_Amount) * 100;
+
+        // STEP 1: Create Razorpay Order securely
+        const orderResponse = await fetch(SCRIPT_URL, {
           redirect: "follow",
           method: "POST",
-          body: JSON.stringify(formDataObj),
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "createOrder",
+            amount: amountInPaise
+          }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
 
-        const data = await res.json();
-        if (data.status === "success") {
-          showNotification("Booking Confirmed!", "is-success");
-          setTimeout(() => resetForm(), 2000);
-        } else {
-          throw new Error(data.message || "Failed");
-        }
+        const orderData = await orderResponse.json();
+        if (orderData.status !== "success") throw new Error(orderData.message);
+
+        // STEP 2: Launch Razorpay UI
+        const options = {
+          "key": orderData.key_id,
+          "amount": orderData.amount,
+          "currency": orderData.currency,
+          "name": "Turf Slot Booking",
+          "description": "Payment for " + selectedSlots.length + " slots",
+          "order_id": orderData.orderId,
+          "handler": async function (response) {
+            // STEP 3: Payment Success - Verify and Save
+            showLoading(true);
+            try {
+              const verifyResponse = await fetch(SCRIPT_URL, {
+                redirect: "follow",
+                method: "POST",
+                body: JSON.stringify({
+                  action: "verifyAndSave",
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  bookingData: formDataObj
+                }),
+                headers: { "Content-Type": "text/plain;charset=utf-8" }
+              });
+
+              const verifyData = await verifyResponse.json();
+              if (verifyData.status === "success") {
+                showNotification("Payment Successful! Booking Confirmed.", "is-success");
+                setTimeout(() => resetForm(), 3000);
+              } else {
+                throw new Error(verifyData.message);
+              }
+            } catch (err) {
+              showNotification("Error verifying payment: " + err.message, "is-danger");
+            } finally {
+              showLoading(false);
+            }
+          },
+          "prefill": {
+            "name": formDataObj.User,
+            "contact": formDataObj.Mobile_Number
+          },
+          "theme": { "color": "#2b7a56" },
+          "modal": {
+            "ondismiss": function () {
+              showLoading(false);
+              showNotification("Payment cancelled. Booking was NOT saved.", "is-warning");
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          showNotification("Payment failed: " + response.error.description, "is-danger");
+          showLoading(false);
+        });
+        rzp.open();
+
       } catch (error) {
+        console.error("Payment initiation failed:", error);
         showNotification("Error: " + error.message, "is-danger");
-        fetchAvailability().then(() => renderSlots());
-      } finally {
         showLoading(false);
       }
     });
@@ -451,7 +479,9 @@
       messageDiv.textContent = text;
       messageDiv.className = `notification mt-4 ${type}`;
       messageDiv.style.display = "block";
-      if (type !== 'is-danger') setTimeout(() => messageDiv.style.display = "none", 5000);
+      if (type !== 'is-danger') setTimeout(() => {
+        if (messageDiv.textContent === text) messageDiv.style.display = "none";
+      }, 5000);
     }
 
     function showLoading(isLoading) {
