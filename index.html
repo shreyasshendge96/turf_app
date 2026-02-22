@@ -1,493 +1,451 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Master | Premium Slot Booking</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
-  <title>Turf Slot Booking</title>
-  <!-- Razorpay Checkout JS -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
+    :root {
+      --primary: #00d1b2;
+      --turf-dark: #0a2e1f;
+      --turf-green: #2b7a56;
+      --turf-bright: #32ff7e;
+      --glass: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top right, #1a4731, #0a1f16);
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .hero-glass {
+      background: linear-gradient(135deg, rgba(43, 122, 86, 0.2), rgba(10, 46, 31, 0.8));
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 3rem 1rem;
+    }
+
+    .glass-card {
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+      margin-bottom: 2rem;
+    }
+
+    .label {
+      color: #b0d4c1 !important;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    .input {
+      background: rgba(255, 255, 255, 0.03) !important;
+      border: 1px solid var(--glass-border) !important;
+      color: white !important;
+      border-radius: 10px !important;
+      height: 3rem;
+    }
+
+    .input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .input:focus {
+      border-color: var(--turf-bright) !important;
+      box-shadow: 0 0 10px rgba(50, 255, 126, 0.2) !important;
+    }
+
     .slot-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 10px;
-      margin-top: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 1rem;
     }
 
     .slot-btn {
-      border: 1px solid #dbdbdb;
-      padding: 12px 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      padding: 15px 5px;
       text-align: center;
       cursor: pointer;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-      background-color: white;
-      user-select: none;
-      font-size: 0.9rem;
-      position: relative;
+      border-radius: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      font-size: 0.85rem;
+      color: #ccc;
     }
 
     .slot-btn:hover:not(.is-disabled):not(.is-booked) {
-      border-color: #48c78e;
-      background-color: #f9fffb;
+      background: rgba(50, 255, 126, 0.1);
+      border-color: var(--turf-bright);
+      transform: translateY(-3px);
+      color: white;
     }
 
     .slot-btn.is-selected {
-      background-color: #48c78e;
-      color: white;
-      border-color: #38b37a;
-      font-weight: bold;
-      box-shadow: 0 2px 5px rgba(72, 199, 142, 0.3);
+      background: var(--turf-bright);
+      color: #0a2e1f;
+      border-color: var(--turf-bright);
+      font-weight: 700;
+      box-shadow: 0 0 15px rgba(50, 255, 126, 0.5);
     }
 
     .slot-btn.is-disabled {
-      background-color: #f5f5f5;
-      color: #b5b5b5;
-      border-color: #eeeeee;
+      opacity: 0.3;
       cursor: not-allowed;
-      opacity: 0.7;
+      text-decoration: line-through;
     }
 
     .slot-btn.is-booked {
-      background-color: #ffdce0;
+      background: rgba(241, 70, 104, 0.1);
       color: #f14668;
-      border-color: #f14668;
+      border-color: rgba(241, 70, 104, 0.4);
       cursor: not-allowed;
-      opacity: 0.8;
       font-weight: bold;
     }
 
-    .slot-btn.is-booked::after {
-      content: "Booked";
-      display: block;
-      font-size: 0.7rem;
-      margin-top: 2px;
+    /* Custom File Upload Styling */
+    .file-input-wrapper {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px dashed var(--glass-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.3s;
     }
 
-    .form-container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
+    .file-input-wrapper:hover {
+      border-color: var(--turf-bright);
+      background: rgba(50, 255, 126, 0.05);
     }
 
-    .hero.is-primary {
-      background-color: #2b7a56;
-    }
-
-    .shadow {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .loading-overlay {
+    .file-input-wrapper input {
       position: absolute;
+      opacity: 0;
       top: 0;
       left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      border-radius: 6px;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
     }
 
-    .debug-box {
-      font-family: monospace;
-      font-size: 0.8rem;
-      background: #fdfdfd;
-      border: 1px solid #ddd;
-      padding: 10px;
-      margin-top: 20px;
-      white-space: pre-wrap;
-      color: #333;
-      text-align: left;
+    #photoPreview {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 1rem;
+      display: none;
+      border: 1px solid var(--glass-border);
+    }
+
+    .booking-bar {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 1rem 2rem;
+      border-radius: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2rem;
+    }
+
+    .btn-book {
+      background: linear-gradient(90deg, #2ecc71, #27ae60);
+      color: white;
+      border: none;
+      padding: 1rem 3rem;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      transition: all 0.3s;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+    }
+
+    .btn-book:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(46, 204, 113, 0.5);
+      filter: brightness(1.1);
+    }
+
+    .btn-book:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .debug-panel {
+      font-size: 0.75rem;
+      color: #666;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 1rem;
+      margin-top: 3rem;
     }
   </style>
 </head>
 
 <body>
-  <section class="hero is-primary is-bold">
-    <div class="hero-body">
-      <div class="container has-text-centered">
-        <h1 class="title">Turf Slot Booking</h1>
-        <p class="subtitle">Book your game in minutes</p>
-      </div>
+
+  <section class="hero-glass has-text-centered">
+    <div class="container">
+      <h1 class="title is-1 has-text-white has-text-weight-bold">TURF <span
+          style="color:var(--turf-bright)">MASTER</span></h1>
+      <p class="subtitle has-text-grey-light">Unleash Your Game | Premium Slot Booking</p>
     </div>
   </section>
 
-  <div class="form-container">
-    <form id="form" class="box shadow">
-      <div class="columns">
-        <div class="column is-6">
-          <div class="field">
-            <label class="label">User</label>
-            <div class="control">
-              <input class="input" type="text" placeholder="Enter your name" name="User" id="inputUser" required />
+  <div class="container mt-6 px-4">
+    <div class="columns is-centered">
+      <div class="column is-10">
+        <form id="bookingForm" class="glass-card">
+          <div class="columns is-multiline">
+            <div class="column is-4">
+              <label class="label">FULL NAME</label>
+              <input class="input" type="text" name="User" placeholder="e.g. Cristiano Ronaldo" required />
+            </div>
+            <div class="column is-4">
+              <label class="label">MOBILE NUMBER</label>
+              <input class="input" type="tel" name="Mobile_Number" pattern="[0-9]{10}" placeholder="10 Digit Mobile"
+                required />
+            </div>
+            <div class="column is-4">
+              <label class="label">BOOKING DATE</label>
+              <input class="input" type="date" name="Select_Date" id="bookingDate" required />
             </div>
           </div>
-        </div>
-        <div class="column is-6">
-          <div class="field">
-            <label class="label">Mobile_Number</label>
-            <div class="control">
-              <input class="input" type="tel" placeholder="10 digit mobile number" name="Mobile_Number" id="inputMobile"
-                pattern="[0-9]{10}" required />
+
+          <div class="mt-5" style="position: relative;">
+            <label class="label">SELECT YOUR SLOTS (₹500/hr)</label>
+            <div id="loader" class="notification is-dark py-2 has-text-centered is-size-7" style="display:none">
+              Searching live availability...</div>
+            <div class="slot-grid" id="slotGrid"></div>
+            <input type="hidden" name="Select Time Slots (500 per hr)" id="selectedSlotsInput" required />
+          </div>
+
+          <div class="columns mt-6">
+            <div class="column is-7">
+              <label class="label">PHOTO ID PROOF (Required)</label>
+              <div class="file-input-wrapper">
+                <p id="fileLabel">Click or Drag to Upload ID Proof</p>
+                <input type="file" id="photoIdInput" accept="image/*" required />
+                <img id="photoPreview" alt="ID Proof Preview" />
+              </div>
+            </div>
+            <div class="column is-5">
+              <div class="is-flex is-flex-direction-column is-justify-content-center" style="height:100%">
+                <div class="is-flex is-justify-content-between mb-2">
+                  <span class="has-text-grey">Slots Selected:</span>
+                  <span id="slotCount" class="has-text-weight-bold">0</span>
+                </div>
+                <div class="is-flex is-justify-content-between mb-4">
+                  <span class="has-text-grey">Total Amount:</span>
+                  <span class="is-size-3 has-text-white has-text-weight-bold">₹<span id="totalAmount">0</span></span>
+                </div>
+                <button type="submit" id="submitBtn" class="btn-book">SECURE BOOKING</button>
+              </div>
             </div>
           </div>
+
+          <!-- Hidden tracking fields -->
+          <input type="hidden" name="Total_Amount" id="hiddenAmount" />
+          <input type="hidden" name="Payment_Status" id="hiddenStatus" value="Pending" />
+          <input type="hidden" name="Transaction_ID" id="hiddenTxn" />
+        </form>
+
+        <div id="message" class="notification notification-glass" style="display:none; background: rgba(0,0,0,0.6);">
+        </div>
+
+        <div class="debug-panel has-text-centered">
+          <p>SERVER: <span id="serverStatus">Checking...</span> | VERSION: V9-IMAGE-UPLOAD</p>
+          <button type="button" class="button is-ghost is-small" onclick="location.reload()">Manual Sync</button>
         </div>
       </div>
-
-      <div class="field">
-        <label class="label">Select_Date</label>
-        <div class="control">
-          <input class="input" type="date" name="Select_Date" id="bookingDate" required />
-        </div>
-      </div>
-
-      <div class="field" style="position: relative;">
-        <label class="label">Select Time Slots (500 per hr)</label>
-        <div id="slotLoadingOverlay" class="loading-overlay" style="display: none;">
-          <div class="button is-loading is-white">Searching...</div>
-        </div>
-        <div class="slot-grid" id="slotGrid">
-          <!-- Slots will be generated here by JavaScript -->
-        </div>
-        <input type="hidden" name="Select Time Slots (500 per hr)" id="selectedSlotsInput" required />
-        <button type="button" class="button is-small is-fullwidth mt-2" id="refreshSlotsBtn">Manual Refresh
-          Slots</button>
-      </div>
-
-      <hr />
-
-      <div class="columns is-vcentered">
-        <div class="column">
-          <div class="field">
-            <label class="label">Total_Amount (₹)</label>
-            <div class="control">
-              <input class="input is-static is-size-4 has-text-weight-bold" type="text" name="Total_Amount"
-                id="amountDisplay" value="0" readonly />
-            </div>
-          </div>
-        </div>
-        <div class="column">
-          <div class="field">
-            <label class="label">Transaction_ID</label>
-            <div class="control">
-              <input class="input" type="text" placeholder="Generated after payment" name="Transaction_ID"
-                id="inputTransactionId" readonly />
-            </div>
-          </div>
-        </div>
-        <div class="column">
-          <div class="field">
-            <label class="label">Payment_Status</label>
-            <div class="control">
-              <input class="input" type="text" placeholder="Pending" name="Payment_Status" id="inputPaymentStatus"
-                value="Pending" readonly />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="field is-grouped is-grouped-centered mt-5">
-        <div class="control">
-          <button class="button is-success is-large" type="submit" id="submit-button">
-            Proceed to Payment
-          </button>
-        </div>
-        <div class="control">
-          <button class="button is-light is-large" type="button" id="resetButton">
-            Reset
-          </button>
-        </div>
-      </div>
-    </form>
-
-    <div id="message" class="notification mt-4" style="display: none"></div>
-
-    <!-- Troubleshooting Tools -->
-    <div class="mt-6 has-text-centered">
-      <h3 class="title is-5">Server Diagnostics</h3>
-      <div class="buttons is-centered">
-        <button class="button is-small is-info is-outlined" id="checkScriptBtn">Verify Connection</button>
-        <button class="button is-small is-light" id="openScriptBtn">Direct Status Check</button>
-      </div>
-      <div id="debugLog" class="debug-box" style="display:none"></div>
     </div>
   </div>
 
   <script>
-    const form = document.getElementById("form");
-    const submitButton = document.getElementById("submit-button");
-    const messageDiv = document.getElementById("message");
-    const slotGrid = document.getElementById("slotGrid");
-    const amountDisplay = document.getElementById("amountDisplay");
-    const selectedSlotsInput = document.getElementById("selectedSlotsInput");
-    const bookingDateInput = document.getElementById("bookingDate");
-    const resetButton = document.getElementById("resetButton");
-    const slotLoadingOverlay = document.getElementById("slotLoadingOverlay");
-    const debugLog = document.getElementById("debugLog");
-    const checkScriptBtn = document.getElementById("checkScriptBtn");
-    const refreshSlotsBtn = document.getElementById("refreshSlotsBtn");
-    const openScriptBtn = document.getElementById("openScriptBtn");
-
-    const PRICE_PER_SLOT = 500;
-    // UPDATE THIS URL AFTER EVERY NEW DEPLOYMENT (Select 'Anyone' access)
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2O4KA74_JMWxdcvLyUs0eTUjK5fZarngPIzOXjucXHT3NNhY2uQ_toeBD53YYrcU1Lw/exec";
+    const PRICE_PER_SLOT = 500;
 
     let selectedSlots = [];
     let bookedSlots = [];
+    let photoBase64 = null;
+    let photoName = null;
 
-    // Set min date to today
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    bookingDateInput.setAttribute("min", todayStr);
-    bookingDateInput.value = todayStr;
+    // Elements
+    const bookingForm = document.getElementById("bookingForm");
+    const dateInput = document.getElementById("bookingDate");
+    const slotGrid = document.getElementById("slotGrid");
+    const photoIdInput = document.getElementById("photoIdInput");
+    const photoPreview = document.getElementById("photoPreview");
+    const fileLabel = document.getElementById("fileLabel");
+    const submitBtn = document.getElementById("submitBtn");
 
-    const slotsData = [
-      { label: "12 AM - 01 AM", start: 0 }, { label: "01 AM - 02 AM", start: 1 },
-      { label: "02 AM - 03 AM", start: 2 }, { label: "03 AM - 04 AM", start: 3 },
-      { label: "04 AM - 05 AM", start: 4 }, { label: "05 AM - 06 AM", start: 5 },
-      { label: "06 AM - 07 AM", start: 6 }, { label: "07 AM - 08 AM", start: 7 },
-      { label: "08 AM - 09 AM", start: 8 }, { label: "09 AM - 10 AM", start: 9 },
-      { label: "10 AM - 11 AM", start: 10 }, { label: "11 AM - 12 PM", start: 11 },
-      { label: "12 PM - 01 PM", start: 12 }, { label: "01 PM - 02 PM", start: 13 },
-      { label: "02 PM - 03 PM", start: 14 }, { label: "03 PM - 04 PM", start: 15 },
-      { label: "04 PM - 05 PM", start: 16 }, { label: "05 PM - 06 PM", start: 17 },
-      { label: "06 PM - 07 PM", start: 18 }, { label: "07 PM - 08 PM", start: 19 },
-      { label: "08 PM - 09 PM", start: 20 }, { label: "09 PM - 10 PM", start: 21 },
-      { label: "10 PM - 11 PM", start: 22 }, { label: "11 PM - 12 AM", start: 23 }
-    ];
+    // Init Date
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+    dateInput.value = today;
 
-    bookingDateInput.addEventListener("change", fetchAndRender);
-    refreshSlotsBtn.addEventListener("click", fetchAndRender);
-    openScriptBtn.addEventListener("click", () => {
-      window.open(`${SCRIPT_URL}?check=version`, '_blank');
+    // Slots Data
+    const hours = Array.from({ length: 24 }, (_, i) => {
+      const h = i % 12 || 12;
+      const ampm = i < 12 ? 'AM' : 'PM';
+      const label = `${h.toString().padStart(2, '0')} ${ampm} - ${(i + 1) % 12 || 12}${i + 1 < 12 || (i + 1 === 24) ? ' AM' : ' PM'}`;
+      return { label, start: i };
     });
 
-    async function fetchAndRender() {
-      selectedSlots = [];
-      await fetchAvailability();
-      renderSlots();
-      updateTotals();
-    }
-
-    async function fetchAvailability() {
-      const selectedDate = bookingDateInput.value;
-      if (!selectedDate) return;
-
-      slotLoadingOverlay.style.display = "flex";
-      try {
-        const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}`, {
-          method: 'GET',
-          redirect: 'follow',
-        });
-
-        if (!response.ok) throw new Error("Server Status: " + response.status);
-
-        const data = await response.json();
-        if (data.status === "success") {
-          bookedSlots = data.bookedSlots || [];
-        } else {
-          logDebug("Server Busy/Error: " + data.message);
-        }
-      } catch (error) {
-        console.error("Availability error:", error);
-        logDebug("Fetch Error (Likely CORS): " + error.message);
-        logDebug("PROBABLE CAUSE: Deployment 'Who has access' is NOT set to 'Anyone'.");
-      } finally {
-        slotLoadingOverlay.style.display = "none";
+    // Handle Image Preview
+    photoIdInput.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        photoName = file.name;
+        fileLabel.innerText = "Processing Image...";
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          photoBase64 = event.target.result;
+          photoPreview.src = photoBase64;
+          photoPreview.style.display = "block";
+          fileLabel.innerText = `ID Locked: ${file.name}`;
+        };
+        reader.readAsDataURL(file);
       }
-    }
+    });
 
-    checkScriptBtn.addEventListener("click", async () => {
-      checkScriptBtn.classList.add("is-loading");
-      debugLog.style.display = "block";
-      logDebug("Testing connection to: " + SCRIPT_URL);
+    async function syncAvailability() {
+      document.getElementById("loader").style.display = "block";
       try {
-        const res = await fetch(`${SCRIPT_URL}?check=version`, { redirect: 'follow' });
+        const res = await fetch(`${SCRIPT_URL}?date=${dateInput.value}`, { redirect: 'follow' });
         const data = await res.json();
-        logDebug("SUCCESS! Version: " + data.version + " | Time: " + data.time);
+        bookedSlots = data.bookedSlots || [];
+        document.getElementById("serverStatus").innerText = "CONNECTED";
       } catch (e) {
-        logDebug("CRITICAL ERROR: " + e.message);
+        document.getElementById("serverStatus").innerText = "SYNC ERROR";
       } finally {
-        checkScriptBtn.classList.remove("is-loading");
+        document.getElementById("loader").style.display = "none";
+        renderSlots();
       }
-    });
-
-    function logDebug(msg) {
-      debugLog.textContent += "\n[" + new Date().toLocaleTimeString() + "] " + msg;
     }
 
     function renderSlots() {
       slotGrid.innerHTML = "";
-      const selectedDate = bookingDateInput.value;
-      const hoursNow = now.getHours();
-      const isToday = selectedDate === todayStr;
+      const isToday = dateInput.value === today;
+      const currentHour = new Date().getHours();
 
-      slotsData.forEach(slot => {
-        const btn = document.createElement("div");
-        const isPast = isToday && slot.start <= hoursNow;
-        const isAlreadyBooked = bookedSlots.includes(slot.label);
+      hours.forEach(slot => {
+        const div = document.createElement("div");
+        const isPast = isToday && slot.start <= currentHour;
+        const isOccupied = bookedSlots.includes(slot.label);
 
-        btn.className = "slot-btn";
-        if (isPast) btn.classList.add("is-disabled");
-        if (isAlreadyBooked) btn.classList.add("is-booked");
+        div.className = "slot-btn";
+        if (isPast) div.classList.add("is-disabled");
+        if (isOccupied) div.classList.add("is-booked");
+        if (selectedSlots.includes(slot.label)) div.classList.add("is-selected");
 
-        btn.textContent = slot.label;
+        div.innerText = slot.label;
 
-        if (!isPast && !isAlreadyBooked) {
-          btn.addEventListener("click", () => toggleSlot(slot.label, btn));
+        if (!isPast && !isOccupied) {
+          div.onclick = () => {
+            if (selectedSlots.includes(slot.label)) {
+              selectedSlots = selectedSlots.filter(s => s !== slot.label);
+            } else {
+              selectedSlots.push(slot.label);
+            }
+            updateUI();
+            renderSlots();
+          };
         }
-
-        slotGrid.appendChild(btn);
+        slotGrid.appendChild(div);
       });
     }
 
-    function toggleSlot(slotLabel, btn) {
-      if (selectedSlots.includes(slotLabel)) {
-        selectedSlots = selectedSlots.filter(s => s !== slotLabel);
-        btn.classList.remove("is-selected");
-      } else {
-        selectedSlots.push(slotLabel);
-        btn.classList.add("is-selected");
-      }
-      updateTotals();
+    function updateUI() {
+      document.getElementById("slotCount").innerText = selectedSlots.length;
+      document.getElementById("totalAmount").innerText = selectedSlots.length * PRICE_PER_SLOT;
+      document.getElementById("hiddenAmount").value = selectedSlots.length * PRICE_PER_SLOT;
+      document.getElementById("selectedSlotsInput").value = selectedSlots.join(", ");
     }
 
-    function updateTotals() {
-      const count = selectedSlots.length;
-      amountDisplay.value = count * PRICE_PER_SLOT;
-      selectedSlotsInput.value = selectedSlots.join(", ");
-    }
+    dateInput.onchange = () => { selectedSlots = []; updateUI(); syncAvailability(); };
 
-    async function resetForm() {
-      form.reset();
-      selectedSlots = [];
-      messageDiv.style.display = "none";
-      bookingDateInput.value = todayStr;
-      await fetchAvailability();
-      renderSlots();
-      updateTotals();
-    }
-
-    resetButton.addEventListener("click", resetForm);
-
-    (async () => {
-      await fetchAvailability();
-      renderSlots();
-      updateTotals();
-    })();
-
-    // RAZORPAY INTEGRATION LOGIC
-    form.addEventListener("submit", async function (e) {
+    bookingForm.onsubmit = async (e) => {
       e.preventDefault();
-      if (selectedSlots.length === 0) {
-        showNotification("Please select at least one slot", "is-warning");
-        return;
-      }
+      if (selectedSlots.length === 0) return alert("Select at least one slot!");
+      if (!photoBase64) return alert("Photo ID is mandatory!");
 
-      showLoading(true);
+      submitBtn.disabled = true;
+      submitBtn.innerText = "PREPARING PAYMENT...";
 
       try {
-        const formDataObj = Object.fromEntries(new FormData(this));
-        const amountInPaise = parseInt(formDataObj.Total_Amount) * 100;
+        const formData = Object.fromEntries(new FormData(bookingForm));
+        const amountPaise = parseInt(formData.Total_Amount) * 100;
 
-        // STEP 1: Create Razorpay Order securely
-        const orderResponse = await fetch(SCRIPT_URL, {
-          redirect: "follow",
+        // Step 1: Create RZP Order
+        const orderRes = await fetch(SCRIPT_URL, {
           method: "POST",
-          body: JSON.stringify({
-            action: "createOrder",
-            amount: amountInPaise
-          }),
-          headers: { "Content-Type": "text/plain;charset=utf-8" }
+          body: JSON.stringify({ action: "createOrder", amount: amountPaise }),
+          redirect: "follow"
         });
+        const order = await orderRes.json();
+        if (order.status !== "success") throw new Error(order.message);
 
-        const orderData = await orderResponse.json();
-        if (orderData.status !== "success") throw new Error(orderData.message);
-
-        // STEP 2: Launch Razorpay UI
+        // Step 2: Open RZP Checkout
         const options = {
-          "key": orderData.key_id,
-          "amount": orderData.amount,
-          "currency": orderData.currency,
-          "name": "Turf Slot Booking",
-          "description": "Payment for " + selectedSlots.length + " slots",
-          "order_id": orderData.orderId,
+          "key": order.key_id,
+          "amount": order.amount,
+          "currency": order.currency,
+          "name": "TURF MASTER",
+          "description": `Booking for ${selectedSlots.length} slots`,
+          "order_id": order.orderId,
           "handler": async function (response) {
-            // STEP 3: Payment Success - Verify and Save
-            showLoading(true);
-            try {
-              const verifyResponse = await fetch(SCRIPT_URL, {
-                redirect: "follow",
-                method: "POST",
-                body: JSON.stringify({
-                  action: "verifyAndSave",
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                  bookingData: formDataObj
-                }),
-                headers: { "Content-Type": "text/plain;charset=utf-8" }
-              });
-
-              const verifyData = await verifyResponse.json();
-              if (verifyData.status === "success") {
-                showNotification("Payment Successful! Booking Confirmed.", "is-success");
-                setTimeout(() => resetForm(), 3000);
-              } else {
-                throw new Error(verifyData.message);
-              }
-            } catch (err) {
-              showNotification("Error verifying payment: " + err.message, "is-danger");
-            } finally {
-              showLoading(false);
+            submitBtn.innerText = "VERIFYING & LOCKING SLOTS...";
+            const verifyRes = await fetch(SCRIPT_URL, {
+              method: "POST",
+              body: JSON.stringify({
+                action: "verifyAndSave",
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingData: formData,
+                photoIdData: photoBase64,
+                photoIdName: photoName
+              }),
+              redirect: "follow"
+            });
+            const result = await verifyRes.json();
+            if (result.status === "success") {
+              alert("BOOKING CONFIRMED!\nTransaction ID: " + response.razorpay_payment_id);
+              location.reload();
+            } else {
+              alert("Verification Error: " + result.message);
             }
           },
-          "prefill": {
-            "name": formDataObj.User,
-            "contact": formDataObj.Mobile_Number
-          },
-          "theme": { "color": "#2b7a56" },
-          "modal": {
-            "ondismiss": function () {
-              showLoading(false);
-              showNotification("Payment cancelled. Booking was NOT saved.", "is-warning");
-            }
-          }
+          "prefill": { "name": formData.User, "contact": formData.Mobile_Number },
+          "theme": { "color": "#00d1b2" },
+          "modal": { "ondismiss": () => { submitBtn.disabled = false; submitBtn.innerText = "SECURE BOOKING"; } }
         };
-
         const rzp = new Razorpay(options);
-        rzp.on('payment.failed', function (response) {
-          showNotification("Payment failed: " + response.error.description, "is-danger");
-          showLoading(false);
-        });
         rzp.open();
-
-      } catch (error) {
-        console.error("Payment initiation failed:", error);
-        showNotification("Error: " + error.message, "is-danger");
-        showLoading(false);
+      } catch (err) {
+        alert("Operation Failed: " + err.message);
+        submitBtn.disabled = false;
+        submitBtn.innerText = "SECURE BOOKING";
       }
-    });
+    };
 
-    function showNotification(text, type) {
-      messageDiv.textContent = text;
-      messageDiv.className = `notification mt-4 ${type}`;
-      messageDiv.style.display = "block";
-      if (type !== 'is-danger') setTimeout(() => {
-        if (messageDiv.textContent === text) messageDiv.style.display = "none";
-      }, 5000);
-    }
+    // Initial Load
+    syncAvailability();
 
-    function showLoading(isLoading) {
-      submitButton.disabled = isLoading;
-      submitButton.classList.toggle("is-loading", isLoading);
-    }
   </script>
 </body>
 
