@@ -296,3 +296,26 @@ function testRazorpayCall() {
   });
   Logger.log(response.getContentText());
 }
+
+/**
+ * Test Pricing Data from Sheet (safe to run manually in editor)
+ * Run this in the Script Editor to verify prices are being read correctly.
+ */
+function testFetchPricing() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
+  if (!sheet) {
+    Logger.log("ERROR: Sheet '" + DATA_ENTRY_SHEET_NAME + "' not found! Check the sheet tab name.");
+    return;
+  }
+  const data = sheet.getRange("I2:J8").getValues();
+  Logger.log("Raw I2:J8 data: " + JSON.stringify(data));
+  const pricing = {};
+  data.forEach(row => {
+    if (row[0]) {
+      const dayName = row[0].toString().trim().toLowerCase();
+      pricing[dayName] = row[1];
+    }
+  });
+  Logger.log("Pricing (lowercase keys): " + JSON.stringify(pricing));
+  Logger.log("✅ If you see all 7 days above with correct prices, the backend is working fine!");
+}

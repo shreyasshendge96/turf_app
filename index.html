@@ -914,14 +914,21 @@
       try {
         const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
         const data = await res.json();
+        console.log("fetchPricing raw response:", data);
         if (data.status === "success" && data.pricing) {
-          weeklyPricing = data.pricing;
+          // ✅ Normalize ALL keys to lowercase - works with old & new backend
+          weeklyPricing = {};
+          Object.keys(data.pricing).forEach(k => {
+            weeklyPricing[k.toLowerCase()] = data.pricing[k];
+          });
+          console.log("weeklyPricing (normalized):", weeklyPricing);
           updatePriceBySelectedDate();
         } else {
+          console.error("fetchPricing failed:", data);
           priceLabel.innerText = "Price unavailable";
         }
       } catch (e) {
-        console.error("fetchPricing failed:", e);
+        console.error("fetchPricing exception:", e);
         priceLabel.innerText = "Price unavailable";
       }
     }

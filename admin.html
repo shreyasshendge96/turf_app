@@ -466,12 +466,20 @@
             try {
                 const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
                 const data = await res.json();
+                console.log("Admin: fetchPricing raw:", data);
                 if (data.status === "success" && data.pricing) {
-                    renderPriceTable(data.pricing);
+                    // ✅ Normalize keys - works with old ('Monday') & new ('monday') backend
+                    const normalized = {};
+                    Object.keys(data.pricing).forEach(k => {
+                        normalized[k.toLowerCase()] = data.pricing[k];
+                    });
+                    console.log("Admin: normalized pricing:", normalized);
+                    renderPriceTable(normalized);
                 } else {
                     table.innerHTML = `<div class="loading-row" style="color:var(--danger)">❌ Failed: ${data.message || "Unknown"}</div>`;
                 }
             } catch (e) {
+                console.error("Admin: loadPrices error:", e);
                 table.innerHTML = `<div class="loading-row" style="color:var(--danger)">❌ Connection error. Check console.</div>`;
             }
         }
