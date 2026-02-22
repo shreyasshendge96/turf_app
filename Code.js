@@ -1,5 +1,5 @@
 const DATA_ENTRY_SHEET_NAME = "Sheet1";
-const SCRIPT_VERSION = "V15-GAP-STATUS-FIX";
+const SCRIPT_VERSION = "V18-COMPLETE";
 const FOLDER_ID = "11_1y25b-VrUr1qNGY1_dELhyT1Ixuyk6";
 
 // RAZORPAY CREDENTIALS (TEST MODE)
@@ -19,19 +19,27 @@ function doGet(e) {
         status: "success",
         version: SCRIPT_VERSION,
         time: new Date().toLocaleTimeString(),
-        note: "Gap & Status Logic Fixed"
+        note: "Complete V18 - All fixes included"
       });
     }
 
     // 2. Fetch Pricing (Reads from Sheet1 Range I2:J8)
+    // Day names are stored lowercase for robust matching on frontend
     if (action === "fetchPricing") {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
       const data = sheet.getRange("I2:J8").getValues();
       const pricing = {};
       data.forEach(row => {
-        if (row[0]) pricing[row[0].toString().trim()] = row[1];
+        if (row[0]) {
+          const dayName = row[0].toString().trim().toLowerCase();
+          pricing[dayName] = row[1];
+        }
       });
-      return createJsonResponse({ status: "success", pricing: pricing });
+      return createJsonResponse({
+        status: "success",
+        pricing: pricing,
+        keysFound: Object.keys(pricing) // Debug: see exact sheet keys
+      });
     }
 
     // 3. Availability Check
@@ -63,7 +71,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
-      throw new Error("No data received. Manual execution is blocked. Use the website.");
+      throw new Error("No data received. STOP! Do not click 'Run' on doPost in the script editor. It only works when triggered by your website.");
     }
 
     const postData = JSON.parse(e.postData.contents);
@@ -89,9 +97,12 @@ function doPost(e) {
  * Updates pricing in Sheet1 Range I2:J8
  */
 function handleUpdatePricing(data) {
-  if (!data || !data.day) throw new Error("Missing day data.");
+  // Defensive check for manual execution in IDE
+  if (!data || typeof data !== "object" || !data.day) {
+    throw new Error("Missing data in handleUpdatePricing. STOP! Do not click 'Run' on this function in the script editor. Use your admin.html webpage instead.");
+  }
 
-  const day = data.day;
+  const day = data.day.toString().trim().toLowerCase();
   const newPrice = data.price;
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
@@ -100,7 +111,7 @@ function handleUpdatePricing(data) {
 
   let foundRow = -1;
   for (let i = 0; i < days.length; i++) {
-    if (days[i][0].toString().trim() === day) {
+    if (days[i][0].toString().trim().toLowerCase() === day) {
       foundRow = i + 2;
       break;
     }
@@ -149,6 +160,7 @@ function handleCreateOrder(data) {
 }
 
 function handleVerifyAndSave(data) {
+  if (!data || !data.razorpay_order_id) throw new Error("Missing verification payload");
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingData, photoIdData, photoIdName } = data;
 
   // 1. Verify Signature
@@ -177,7 +189,7 @@ function handleVerifyAndSave(data) {
     photoIdUrl = saveToSpecificFolder(photoIdData, photoIdName || "photo_id.jpg");
   }
 
-  // 4. Save to Sheet (Targeting Cols A-G specifically to avoid gaps)
+  // 4. Save to Sheet (Targeting Cols A-G specifically to avoid gaps from I:J pricing table)
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
   const headers = sheet.getRange(1, 1, 1, 7).getValues()[0];
   const row = new Array(headers.length).fill("");
@@ -200,7 +212,7 @@ function handleVerifyAndSave(data) {
     else if (bookingData[h]) {
       row[index] = bookingData[h];
     }
-    // PRIORITY 3: Fuzzy Match
+    // PRIORITY 3: Fuzzy Match (ignore underscores and case)
     else {
       for (let key in bookingData) {
         let keyClean = key.toLowerCase().replace(/_/g, "");
@@ -218,7 +230,6 @@ function handleVerifyAndSave(data) {
   while (nextRow <= colAValues.length && colAValues[nextRow - 1][0] !== "") {
     nextRow++;
   }
-  // If Col A is shorter than sheet.getLastRow(), this will find the gap
 
   sheet.getRange(nextRow, 1, 1, headers.length).setValues([row]);
 
@@ -231,6 +242,7 @@ function handleVerifyAndSave(data) {
 
 function saveToSpecificFolder(base64Data, fileName) {
   try {
+    // Auto-detect content type from base64 string
     const contentType = base64Data.substring(5, base64Data.indexOf(';'));
     const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
     const blob = Utilities.newBlob(bytes, contentType, fileName);
@@ -244,7 +256,10 @@ function saveToSpecificFolder(base64Data, fileName) {
 }
 
 function scanSheetForBookedSlots(date, sheet) {
-  if (!sheet) return [];
+  // Defensive check for manual execution in IDE
+  if (!date || !sheet) {
+    throw new Error("STOP! Do not click 'Run' on scanSheetForBookedSlots in the script editor. This function only works when triggered by your website.");
+  }
   const data = sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), 7).getValues();
   if (data.length < 2) return [];
   const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
@@ -266,4 +281,18 @@ function createJsonResponse(obj) {
 
 function AUTHORIZE_SCRIPT_MANUALLY() {
   Logger.log("Authorization Successful!");
+}
+
+/**
+ * Test Razorpay API connectivity (safe to run manually in editor)
+ */
+function testRazorpayCall() {
+  const response = UrlFetchApp.fetch("https://api.razorpay.com/v1/orders", {
+    method: "get",
+    headers: {
+      "Authorization": "Basic " + Utilities.base64Encode(RZP_KEY_ID + ":" + RZP_KEY_SECRET)
+    },
+    muteHttpExceptions: true
+  });
+  Logger.log(response.getContentText());
 }
