@@ -142,7 +142,7 @@
             const u = document.getElementById("username").value;
             const p = document.getElementById("password").value;
 
-            if (u === "admin" && p === "turf123") {
+            if (u === ADMIN_USERNAME && p === ADMIN_PASSWORD) {
                 document.getElementById("loginSection").style.display = "none";
                 document.getElementById("adminDashboard").style.display = "block";
                 loadPrices();
@@ -152,12 +152,24 @@
         }
 
         async function loadPrices() {
+            console.log("Admin: loadPrices() started");
             const table = document.getElementById("pricingTable");
+
+            if (typeof SCRIPT_URL === 'undefined') {
+                console.error("Admin Error: SCRIPT_URL is not defined! Check if script.js is uploaded and linked correctly.");
+                table.innerHTML = `<p class="has-text-danger">Configuration Error: SCRIPT_URL missing.</p>`;
+                return;
+            }
+
+            console.log("Admin: Fetching from:", SCRIPT_URL);
             try {
                 const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
-                const data = await res.json();
+                console.log("Admin: Fetch response received:", res.status);
 
-                if (data.status === "success") {
+                const data = await res.json();
+                console.log("Admin: Data parsed:", data);
+
+                if (data.status === "success" && data.pricing) {
                     table.innerHTML = "";
                     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -166,17 +178,21 @@
                         const div = document.createElement("div");
                         div.className = "pricing-row";
                         div.innerHTML = `
-              <div class="has-text-weight-bold">${day}</div>
-              <div class="is-flex is-align-items-center">
-                <input class="input is-small mr-2" type="number" id="price_${day}" value="${price}" style="width: 80px;">
-                <button class="btn-update" id="btn_${day}" onclick="updatePrice('${day}')">Update</button>
-              </div>
-            `;
+                            <div class="has-text-weight-bold">${day}</div>
+                            <div class="is-flex is-align-items-center">
+                                <input class="input is-small mr-2" type="number" id="price_${day}" value="${price}" style="width: 80px;">
+                                <button class="btn-update" id="btn_${day}" onclick="updatePrice('${day}')">Update</button>
+                            </div>
+                        `;
                         table.appendChild(div);
                     });
+                } else {
+                    console.error("Admin: Data status not success or pricing missing:", data);
+                    table.innerHTML = `<p class="has-text-danger">Failed to load prices: ${data.message || 'Unknown error'}</p>`;
                 }
             } catch (e) {
-                table.innerHTML = `<p class="has-text-danger">Failed to load prices.</p>`;
+                console.error("Admin: Fetch exception:", e);
+                table.innerHTML = `<p class="has-text-danger">Connection Error. Check Console for details.</p>`;
             }
         }
 
