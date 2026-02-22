@@ -280,6 +280,7 @@
   <script src="script.js"></script>
   <script>
     let PRICE_PER_SLOT = 500; // Default fallback
+    let weeklyPricing = {}; // Store all prices
 
     let selectedSlots = [];
     let bookedSlots = [];
@@ -314,19 +315,8 @@
         console.log("Index: Data parsed:", data);
 
         if (data.status === "success" && data.pricing) {
-          const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-          const currentDay = days[new Date().getDay()];
-          const dayPrice = data.pricing[currentDay];
-
-          if (dayPrice) {
-            PRICE_PER_SLOT = parseInt(dayPrice);
-            priceLabel.innerText = `₹${PRICE_PER_SLOT}/hr`;
-            console.log("Index: Applied Price:", PRICE_PER_SLOT);
-            updateUI(); // Refresh totals if already selected
-          } else {
-            console.warn("Index: Day price missing in data:", currentDay);
-            priceLabel.innerText = "Price unavailable";
-          }
+          weeklyPricing = data.pricing;
+          updatePriceBySelectedDate();
         } else {
           console.error("Index: Data status not success or pricing missing:", data);
           priceLabel.innerText = "Price unavailable";
@@ -337,10 +327,32 @@
       }
     }
 
-    // Init Date
+    function updatePriceBySelectedDate() {
+      // Use local date string to avoid timezone shifts
+      const dateParts = dateInput.value.split('-');
+      const selectedDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const currentDay = days[selectedDate.getDay()];
+      const dayPrice = weeklyPricing[currentDay];
+
+      console.log("Index: Date changed to:", dateInput.value, "Day:", currentDay);
+
+      if (dayPrice) {
+        PRICE_PER_SLOT = parseInt(dayPrice);
+        priceLabel.innerText = `₹${PRICE_PER_SLOT}/hr`;
+        console.log("Index: Applied Price for", currentDay, ":", PRICE_PER_SLOT);
+        updateUI(); // Refresh totals
+      } else {
+        console.warn("Index: Day price missing in data:", currentDay);
+        priceLabel.innerText = "Price unavailable";
+      }
+    }
+
+    // Init Date and Listeners
     const today = new Date().toISOString().split('T')[0];
     dateInput.min = today;
     dateInput.value = today;
+    dateInput.addEventListener("change", updatePriceBySelectedDate);
 
     // Slots Data
     const hours = Array.from({ length: 24 }, (_, i) => {
