@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turf Master | Admin Pricing</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d1b2;
+            --turf-dark: #0a2e1f;
+            --turf-green: #2b7a56;
+            --turf-bright: #32ff7e;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, #1a4731, #0a1f16);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .title {
+            color: white !important;
+        }
+
+        .label {
+            color: #b0d4c1 !important;
+        }
+
+        .input {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: white !important;
+            border-radius: 10px !important;
+        }
+
+        .input:focus {
+            border-color: var(--turf-bright) !important;
+        }
+
+        .pricing-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .pricing-row:last-child {
+            border-bottom: none;
+        }
+
+        .btn-update {
+            background: var(--turf-bright);
+            color: #0a2e1f;
+            font-weight: 700;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-update:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 10px var(--turf-bright);
+        }
+
+        .btn-update.is-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        #loginSection {
+            text-align: center;
+        }
+
+        #adminDashboard {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="glass-card">
+        <h1 class="title is-4">Admin Security</h1>
+        <div class="field">
+            <div class="control">
+                <input class="input" type="text" id="username" placeholder="Username" />
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <input class="input" type="password" id="password" placeholder="Password" />
+            </div>
+        </div>
+        <button class="button is-primary is-fullwidth" onclick="login()">Login to Dashboard</button>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="adminDashboard" class="glass-card">
+        <div class="is-flex is-justify-content-between is-align-items-center mb-5">
+            <h1 class="title is-4 mb-0">Price Management</h1>
+            <button class="button is-ghost is-small" onclick="location.reload()">Logout</button>
+        </div>
+
+        <div id="pricingTable">
+            <p class="has-text-centered">Loading prices...</p>
+        </div>
+
+        <hr style="background: var(--glass-border);" />
+        <div class="has-text-centered">
+            <a href="index.html" class="has-text-grey-light is-size-7">← Back to Booking Page</a>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Secret Logic
+        function login() {
+            const u = document.getElementById("username").value;
+            const p = document.getElementById("password").value;
+
+            if (u === "admin" && p === "turf123") {
+                document.getElementById("loginSection").style.display = "none";
+                document.getElementById("adminDashboard").style.display = "block";
+                loadPrices();
+            } else {
+                alert("Invalid credentials!");
+            }
+        }
+
+        async function loadPrices() {
+            const table = document.getElementById("pricingTable");
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    table.innerHTML = "";
+                    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+                    days.forEach(day => {
+                        const price = data.pricing[day] || 500;
+                        const div = document.createElement("div");
+                        div.className = "pricing-row";
+                        div.innerHTML = `
+              <div class="has-text-weight-bold">${day}</div>
+              <div class="is-flex is-align-items-center">
+                <input class="input is-small mr-2" type="number" id="price_${day}" value="${price}" style="width: 80px;">
+                <button class="btn-update" id="btn_${day}" onclick="updatePrice('${day}')">Update</button>
+              </div>
+            `;
+                        table.appendChild(div);
+                    });
+                }
+            } catch (e) {
+                table.innerHTML = `<p class="has-text-danger">Failed to load prices.</p>`;
+            }
+        }
+
+        async function updatePrice(day) {
+            const btn = document.getElementById(`btn_${day}`);
+            const price = document.getElementById(`price_${day}`).value;
+
+            btn.innerText = "Saving...";
+            btn.classList.add("is-loading");
+
+            try {
+                const res = await fetch(SCRIPT_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" }, // Using text/plain for simpler GAS handling
+                    body: JSON.stringify({
+                        action: "updatePricing",
+                        day: day,
+                        price: price
+                    }),
+                    redirect: "follow"
+                });
+                const result = await res.json();
+
+                if (result.status === "success") {
+                    btn.innerText = "Updated!";
+                    btn.style.backgroundColor = "#2ecc71";
+                    setTimeout(() => {
+                        btn.innerText = "Update";
+                        btn.style.backgroundColor = "var(--turf-bright)";
+                    }, 2000);
+                } else {
+                    alert("Error: " + result.message);
+                    btn.innerText = "Error";
+                }
+            } catch (e) {
+                alert("Fetch Error!");
+                btn.innerText = "Error";
+            } finally {
+                btn.classList.remove("is-loading");
+            }
+        }
+    </script>
+</body>
+
+</html>

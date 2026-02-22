@@ -198,6 +198,9 @@
 <body>
 
   <section class="hero-glass has-text-centered">
+    <div style="position: absolute; top: 1rem; right: 1rem;">
+      <a href="admin.html" class="button is-small is-primary is-outlined" style="border-radius: 20px;">Admin Login</a>
+    </div>
     <div class="container">
       <h1 class="title is-1 has-text-white has-text-weight-bold">TURF <span
           style="color:var(--turf-bright)">MASTER</span></h1>
@@ -226,7 +229,7 @@
           </div>
 
           <div class="mt-5" style="position: relative;">
-            <label class="label">SELECT YOUR SLOTS (₹500/hr)</label>
+            <label class="label">SELECT YOUR SLOTS (<span id="priceLabel">Loading price...</span>)</label>
             <div id="loader" class="notification is-dark py-2 has-text-centered is-size-7" style="display:none">
               Searching live availability...</div>
             <div class="slot-grid" id="slotGrid"></div>
@@ -274,9 +277,9 @@
     </div>
   </div>
 
+  <script src="script.js"></script>
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2O4KA74_JMWxdcvLyUs0eTUjK5fZarngPIzOXjucXHT3NNhY2uQ_toeBD53YYrcU1Lw/exec";
-    const PRICE_PER_SLOT = 500;
+    let PRICE_PER_SLOT = 500; // Default fallback
 
     let selectedSlots = [];
     let bookedSlots = [];
@@ -291,6 +294,31 @@
     const photoPreview = document.getElementById("photoPreview");
     const fileLabel = document.getElementById("fileLabel");
     const submitBtn = document.getElementById("submitBtn");
+    const priceLabel = document.getElementById("priceLabel");
+
+    // Fetch dynamic price on load
+    async function fetchPricing() {
+      try {
+        const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
+        const data = await res.json();
+        if (data.status === "success") {
+          const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          const currentDay = days[new Date().getDay()];
+          const dayPrice = data.pricing[currentDay];
+
+          if (dayPrice) {
+            PRICE_PER_SLOT = parseInt(dayPrice);
+            priceLabel.innerText = `₹${PRICE_PER_SLOT}/hr`;
+            updateUI(); // Refresh totals if already selected
+          } else {
+            priceLabel.innerText = "Price unavailable";
+          }
+        }
+      } catch (e) {
+        console.error("Pricing fetch failed:", e);
+        priceLabel.innerText = "Price unavailable";
+      }
+    }
 
     // Init Date
     const today = new Date().toISOString().split('T')[0];
