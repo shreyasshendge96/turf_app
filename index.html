@@ -101,6 +101,12 @@
       margin-top: 20px;
       white-space: pre-wrap;
       color: #333;
+      text-align: left;
+    }
+
+    .error-tag {
+      color: #f14668;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -204,10 +210,15 @@
     <div id="message" class="notification mt-4" style="display: none"></div>
 
     <!-- Troubleshooting Panel -->
-    <div class="mt-6 has-text-centered">
-      <h3 class="title is-5">Server Diagnostics</h3>
-      <button class="button is-small is-info is-outlined" id="checkScriptBtn">Verify Connection & Version</button>
-      <div id="debugLog" class="debug-box" style="display:none"></div>
+    <div class="mt-6 box shadow">
+      <h3 class="title is-5 has-text-centered">Server Diagnostics</h3>
+      <div class="has-text-centered mb-4">
+        <button class="button is-small is-info" id="checkScriptBtn">Run Diagnostics</button>
+        <button class="button is-small is-light" id="openScriptBtn">Open Script Status Directly</button>
+      </div>
+      <div id="debugLog" class="debug-box" style="display:none">
+        <p><strong>System Log:</strong></p>
+      </div>
     </div>
   </div>
 
@@ -224,9 +235,10 @@
     const debugLog = document.getElementById("debugLog");
     const checkScriptBtn = document.getElementById("checkScriptBtn");
     const refreshSlotsBtn = document.getElementById("refreshSlotsBtn");
+    const openScriptBtn = document.getElementById("openScriptBtn");
 
     const PRICE_PER_SLOT = 500;
-    // IMPORTANT: After you deploy as "Anyone", paste the NEW URL here:
+    // CRITICAL: Update this URL after every "New Deployment"
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsoC4odNCzDDRRCqbb0JAQnFQ_7dHoWDSIAswkdesdDwQGaXU-meu6_wQvKLMEkDkDeg/exec";
 
     let selectedSlots = [];
@@ -255,6 +267,10 @@
 
     bookingDateInput.addEventListener("change", fetchAndRender);
     refreshSlotsBtn.addEventListener("click", fetchAndRender);
+    openScriptBtn.addEventListener("click", () => {
+      window.open(`${SCRIPT_URL}?check=version`, '_blank');
+      logDebug("Opened script version check in new tab. If it asks you to sign in, YOUR DEPLOYMENT IS WRONG.");
+    });
 
     async function fetchAndRender() {
       selectedSlots = [];
@@ -269,23 +285,23 @@
 
       slotLoadingOverlay.style.display = "flex";
       try {
-        // Simple fetch without cache-busting timestamp to avoid preflight issues?
         const response = await fetch(`${SCRIPT_URL}?date=${selectedDate}`, {
           method: 'GET',
-          redirect: 'follow', // Required for GAS
+          redirect: 'follow',
         });
 
-        if (!response.ok) throw new Error("Server Status: " + response.status);
+        if (!response.ok) throw new Error("HTTP " + response.status);
 
         const data = await response.json();
         if (data.status === "success") {
           bookedSlots = data.bookedSlots || [];
         } else {
-          logDebug("Server Error: " + data.message);
+          logDebug("Server Busy/Error: " + data.message);
         }
       } catch (error) {
         console.error("Availability error:", error);
         logDebug("Fetch Error (Likely CORS): " + error.message);
+        logDebug("PROBABLE CAUSE: Deployment 'Who has access' is NOT set to 'Anyone'.");
       } finally {
         slotLoadingOverlay.style.display = "none";
       }
@@ -294,9 +310,11 @@
     checkScriptBtn.addEventListener("click", async () => {
       checkScriptBtn.classList.add("is-loading");
       debugLog.style.display = "block";
-      logDebug("TESTING CONNECTION TO: " + SCRIPT_URL);
+      logDebug("DEEP DIAGNOSTIC STARTING...");
+      logDebug("TARGET URL: " + SCRIPT_URL);
 
       try {
+        logDebug("Step 1: Pinging script...");
         const res = await fetch(`${SCRIPT_URL}?check=version`, {
           method: 'GET',
           redirect: 'follow'
@@ -304,32 +322,42 @@
 
         if (res.ok) {
           const data = await res.json();
-          logDebug("SUCCESS! Server Version: " + data.version);
+          logDebug("SUCCESS! Connection established.");
+          logDebug("Server Version: " + data.version);
+          logDebug("Server Time: " + data.time);
+          logDebug("Message: " + data.note);
         } else {
-          logDebug("FAILED! HTTP Status: " + res.status);
+          logDebug("FAILED! Server returned status " + res.status);
+          if (res.status === 401 || res.status === 403) {
+            logDebug("CRITICAL: Access Denied. Check 'Anyone' permissions.");
+          }
         }
       } catch (e) {
         logDebug("ERROR: " + e.message);
-        logDebug("\nPLEASE CHECK:\n1. Did you Deploy as 'Anyone'?\n2. Is the URL correct?");
+        logDebug("\n--- TROUBLESHOOTING GUIDE ---");
+        logDebug("1. Open the 'Script Status' button above. Does it work?");
+        logDebug("2. If it asks to LOG IN, your deployment is 'Who has access: Only Me'");
+        logDebug("3. You MUST re-deploy and select ANYONE.");
       } finally {
         checkScriptBtn.classList.remove("is-loading");
       }
     });
 
     function logDebug(msg) {
-      debugLog.textContent += "\n[" + new Date().toLocaleTimeString() + "] " + msg;
+      const p = document.createElement("p");
+      p.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      debugLog.appendChild(p);
     }
 
     function renderSlots() {
       slotGrid.innerHTML = "";
       const selectedDate = bookingDateInput.value;
-      const now = new Date();
-      const currentHour = now.getHours();
+      const hoursNow = now.getHours();
       const isToday = selectedDate === todayStr;
 
       slotsData.forEach(slot => {
         const btn = document.createElement("div");
-        const isPast = isToday && slot.start <= currentHour;
+        const isPast = isToday && slot.start <= hoursNow;
         const isAlreadyBooked = bookedSlots.includes(slot.label);
 
         btn.className = "slot-btn";
@@ -358,11 +386,11 @@
     }
 
     function updateTotals() {
-      const totalAmount = selectedSlots.length * PRICE_PER_SLOT;
-      amountDisplay.value = totalAmount;
+      const count = selectedSlots.length;
+      amountDisplay.value = count * PRICE_PER_SLOT;
       selectedSlotsInput.value = selectedSlots.join(", ");
 
-      if (selectedSlots.length === 0) {
+      if (count === 0) {
         selectedSlotsInput.setCustomValidity("Please select at least one slot");
       } else {
         selectedSlotsInput.setCustomValidity("");
@@ -381,7 +409,6 @@
 
     resetButton.addEventListener("click", resetForm);
 
-    // Initial load
     (async () => {
       await fetchAvailability();
       renderSlots();
@@ -391,32 +418,28 @@
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
       if (selectedSlots.length === 0) {
-        showNotification("Please select at least one slot", "is-warning");
+        showNotification("Please select a slot", "is-warning");
         return;
       }
 
       showLoading(true);
       try {
-        const formData = new FormData(this);
-        const formDataObj = Object.fromEntries(formData.entries());
-
-        const response = await fetch(SCRIPT_URL, {
+        const formDataObj = Object.fromEntries(new FormData(this));
+        const res = await fetch(SCRIPT_URL, {
           redirect: "follow",
           method: "POST",
           body: JSON.stringify(formDataObj),
           headers: { "Content-Type": "text/plain;charset=utf-8" },
         });
 
-        const data = await response.json();
-
+        const data = await res.json();
         if (data.status === "success") {
           showNotification("Booking Confirmed!", "is-success");
           setTimeout(() => resetForm(), 2000);
         } else {
-          throw new Error(data.message || "Booking failed");
+          throw new Error(data.message || "Failed");
         }
       } catch (error) {
-        console.error("Submission failed:", error);
         showNotification("Error: " + error.message, "is-danger");
         fetchAvailability().then(() => renderSlots());
       } finally {
@@ -428,21 +451,12 @@
       messageDiv.textContent = text;
       messageDiv.className = `notification mt-4 ${type}`;
       messageDiv.style.display = "block";
-      if (type !== 'is-danger') {
-        setTimeout(() => {
-          if (messageDiv.textContent === text) messageDiv.style.display = "none";
-        }, 5000);
-      }
+      if (type !== 'is-danger') setTimeout(() => messageDiv.style.display = "none", 5000);
     }
 
     function showLoading(isLoading) {
-      if (isLoading) {
-        submitButton.disabled = true;
-        submitButton.classList.add("is-loading");
-      } else {
-        submitButton.disabled = false;
-        submitButton.classList.remove("is-loading");
-      }
+      submitButton.disabled = isLoading;
+      submitButton.classList.toggle("is-loading", isLoading);
     }
   </script>
 </body>
