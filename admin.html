@@ -500,8 +500,27 @@
 
         function showDashboard() {
             document.getElementById("loginSection").style.display = "none";
+
+            // Set default date to today for registrations
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('regFilterDate').value = today;
+
+            checkScriptVersion();
             loadDashboardStats();
             checkDriveAccess();
+            loadRegistrations(); // Initial load for today
+        }
+
+        async function checkScriptVersion() {
+            try {
+                const res = await fetch(`${SCRIPT_URL}?check=version`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data.status === "success") {
+                    document.getElementById("scriptVersion").innerText = data.version;
+                }
+            } catch (e) {
+                document.getElementById("scriptVersion").innerText = "OFFLINE";
+            }
         }
 
         // ── Navigation ──
@@ -510,10 +529,12 @@
             document.getElementById(`section_${id}`).style.display = 'block';
 
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            document.querySelector(`.nav-item[onclick*="${id}"]`).classList.add('active');
+            const navItem = document.querySelector(`.nav-item[onclick*="${id}"]`);
+            if (navItem) navItem.classList.add('active');
 
             if (id === 'pricing') loadPrices();
             if (id === 'overview') loadDashboardStats();
+            if (id === 'registrations') loadRegistrations();
         }
 
         // ── Stats & Drive Check ──
@@ -521,12 +542,15 @@
             try {
                 const res = await fetch(`${SCRIPT_URL}?action=fetchDashboardStats`, { redirect: 'follow' });
                 const data = await res.json();
+                console.log("Dashboard Stats Response:", data);
                 if (data.status === "success") {
                     document.getElementById("stat_today").innerText = data.stats.todayBookings;
                     document.getElementById("stat_revenue").innerText = "₹" + data.stats.totalRevenue.toLocaleString();
                     document.getElementById("stat_users").innerText = data.stats.totalUsers;
+                } else {
+                    console.error("Dashboard Stats Error:", data.message);
                 }
-            } catch (e) { console.error("Stats Error:", e); }
+            } catch (e) { console.error("Stats Fetch Failed:", e); }
         }
 
         async function checkDriveAccess() {
@@ -554,12 +578,16 @@
             try {
                 const res = await fetch(`${SCRIPT_URL}?action=fetchRegistrations&date=${date}`, { redirect: 'follow' });
                 const data = await res.json();
+                console.log("Registrations Response:", data);
                 if (data.status === "success") {
                     allRegistrations = data.registrations;
                     renderRegistrations(allRegistrations);
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem; color: var(--danger);">${data.message}</td></tr>`;
                 }
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem; color: var(--danger);">Connection error.</td></tr>`;
+                console.error("Registrations Fetch Failed:", e);
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem; color: var(--danger);">Connection error. Click 'Refresh' to try again.</td></tr>`;
             }
         }
 

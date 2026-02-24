@@ -1,5 +1,5 @@
 const DATA_ENTRY_SHEET_NAME = "Sheet1";
-const SCRIPT_VERSION = "V18-COMPLETE";
+const SCRIPT_VERSION = "V20-DIAGNOSTIC";
 const FOLDER_ID = "11_1y25b-VrUr1qNGY1_dELhyT1Ixuyk6";
 
 // RAZORPAY CREDENTIALS (TEST MODE)
@@ -11,21 +11,24 @@ const RZP_KEY_SECRET = "82ozyK7jcQBAB2NMPIyErDJU";
  */
 function doGet(e) {
   try {
-    const action = e.parameter.action;
+    const params = e.parameter || {};
+    const action = (params.action || "").toString().trim().toLowerCase();
+
+    // DEBUG: Log the incoming request to Apps Script Execution Logs
+    Logger.log(`[GET] Action: ${action}, Params: ${JSON.stringify(params)}`);
 
     // 1. Version Check
-    if (e.parameter.check === "version") {
+    if (params.check === "version") {
       return createJsonResponse({
         status: "success",
         version: SCRIPT_VERSION,
         time: new Date().toLocaleTimeString(),
-        note: "Complete V18 - All fixes included"
+        note: "Complete V19 - Universal Date Support"
       });
     }
 
-    // 2. Fetch Pricing (Reads from Sheet1 Range I2:J8)
-    // Day names are stored lowercase for robust matching on frontend
-    if (action === "fetchPricing") {
+    // 2. Fetch Pricing
+    if (action === "fetchpricing") {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
       const data = sheet.getRange("I2:J8").getValues();
       const pricing = {};
@@ -35,36 +38,27 @@ function doGet(e) {
           pricing[dayName] = row[1];
         }
       });
-      return createJsonResponse({
-        status: "success",
-        pricing: pricing,
-        keysFound: Object.keys(pricing) // Debug: see exact sheet keys
-      });
+      return createJsonResponse({ status: "success", pricing: pricing });
     }
 
-    // 3. Fetch Registrations (Reads from Sheet1 filtered by date)
-    if (action === "fetchRegistrations") {
-      const targetDate = e.parameter.date;
-      if (!targetDate) return createJsonResponse({ status: "error", message: "Date required" });
+    else if (action === "fetchregistrations") {
+      let targetDate = params.date;
+      if (!targetDate || targetDate === "undefined") {
+        return createJsonResponse({ status: "error", message: "Valid Date required (received: " + targetDate + ")" });
+      }
 
       const registrations = scanSheetForRegistrations(targetDate);
-      return createJsonResponse({
-        status: "success",
-        registrations: registrations
-      });
+      return createJsonResponse({ status: "success", registrations: registrations });
     }
 
     // 4. Fetch Dashboard Stats
-    if (action === "fetchDashboardStats") {
+    else if (action === "fetchdashboardstats") {
       const stats = calculateDashboardStats();
-      return createJsonResponse({
-        status: "success",
-        stats: stats
-      });
+      return createJsonResponse({ status: "success", stats: stats });
     }
 
     // 5. Check Drive Folder Access
-    if (action === "checkDriveFolder") {
+    else if (action === "checkdrivefolder") {
       try {
         const folder = DriveApp.getFolderById(FOLDER_ID);
         return createJsonResponse({
@@ -72,35 +66,61 @@ function doGet(e) {
           folderName: folder.getName(),
           message: "Access verified!"
         });
-      } catch (e) {
-        return createJsonResponse({
-          status: "error",
-          message: "Cannot access folder: " + e.toString()
-        });
+      } catch (err) {
+        return createJsonResponse({ status: "error", message: "Folder access error: " + err.toString() });
       }
     }
 
-    // 6. Availability Check
-    const date = e.parameter.date;
-    if (!date) return createJsonResponse({ status: "error", message: "Date required" });
+    // 6. DEFAULT: Availability Check (for booking page)
+    else {
+      let date = params.date;
+      if (!date || date === "undefined") {
+        return createJsonResponse({
+          status: "error",
+          message: "Date required for availability check",
+          received_action: action || "none",
+          received_params: JSON.stringify(params)
+        });
+      }
 
-    const scriptProps = PropertiesService.getScriptProperties();
-    const cacheKey = "booked_" + date;
-    let bookedData = scriptProps.getProperty(cacheKey);
+      const scriptProps = PropertiesService.getScriptProperties();
+      const cacheKey = "booked_" + date;
+      let bookedData = scriptProps.getProperty(cacheKey);
 
-    if (bookedData === null) {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
-      const bookedArray = scanSheetForBookedSlots(date, sheet);
-      bookedData = bookedArray.join(",");
-      scriptProps.setProperty(cacheKey, bookedData);
+      if (bookedData === null) {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
+        const bookedArray = scanSheetForBookedSlots(date, sheet);
+        bookedData = bookedArray.join(",");
+        scriptProps.setProperty(cacheKey, bookedData);
+      }
+
+      const result = bookedData ? bookedData.split(",") : [];
+      return createJsonResponse({ status: "success", bookedSlots: result });
     }
 
-    const result = bookedData ? bookedData.split(",") : [];
-    return createJsonResponse({ status: "success", bookedSlots: result });
-
   } catch (error) {
-    return createJsonResponse({ status: "error", message: error.toString() });
+    return createJsonResponse({ status: "error", message: "Global error: " + error.toString(), version: SCRIPT_VERSION });
   }
+}
+
+/**
+ * Universal Date Parser: Handles Date objects and various string formats.
+ */
+function parseDateToString(d) {
+  if (!d) return "";
+  if (d instanceof Date) return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  let s = d.toString().trim();
+  // If it's DD/MM/YYYY or DD-MM-YYYY, try to normalize
+  if (s.includes("/") || s.includes("-")) {
+    let parts = s.split(/[\/\-]/);
+    if (parts.length === 3) {
+      // Check if it's YYYY at the end or beginning
+      if (parts[0].length === 4) return parts[0] + "-" + parts[1].padStart(2, '0') + "-" + parts[2].padStart(2, '0');
+      if (parts[2].length === 4) return parts[2] + "-" + parts[1].padStart(2, '0') + "-" + parts[0].padStart(2, '0');
+    }
+  }
+  return s;
 }
 
 /**
@@ -353,18 +373,21 @@ function scanSheetForRegistrations(date) {
 
   const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
   const dateIdx = headers.findIndex(h => h.includes("date"));
-  const nameIdx = headers.findIndex(h => h.includes("name"));
-  const mobileIdx = headers.findIndex(h => h.includes("mobile"));
+  const nameIdx = headers.findIndex(h => h.includes("name") || h.includes("user") || h.includes("client"));
+  const mobileIdx = headers.findIndex(h => h.includes("mobile") || h.includes("phone") || h.includes("contact"));
   const ageIdx = headers.findIndex(h => h.includes("age"));
-  const slotIdx = headers.findIndex(h => h.includes("slot"));
-  const statusIdx = headers.findIndex(h => h.includes("status"));
+  const slotIdx = headers.findIndex(h => h.includes("slot") || h.includes("time"));
+  const statusIdx = headers.findIndex(h => h.includes("status") || h.includes("payment"));
 
-  if (dateIdx === -1) return [];
+  Logger.log(`Scanning for date: ${date}. Found headers: ${headers.join(",")}`);
+  if (dateIdx === -1) {
+    Logger.log("ERROR: 'Date' column not found in Sheet1 headers.");
+    return [];
+  }
 
   const results = [];
   for (let i = 1; i < data.length; i++) {
-    let d = data[i][dateIdx];
-    let dStr = (d instanceof Date) ? Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd") : d.toString().trim();
+    let dStr = parseDateToString(data[i][dateIdx]);
 
     if (dStr === date) {
       results.push({
@@ -389,8 +412,14 @@ function calculateDashboardStats() {
 
   const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
   const dateIdx = headers.findIndex(h => h.includes("date"));
-  const amountIdx = headers.findIndex(h => h.includes("amount"));
-  const statusIdx = headers.findIndex(h => h.includes("status"));
+  const amountIdx = headers.findIndex(h => h.includes("amount") || h.includes("total") || h.includes("price"));
+  const statusIdx = headers.findIndex(h => h.includes("status") || h.includes("payment"));
+  const mobileIdx = headers.findIndex(h => h.includes("mobile") || h.includes("phone") || h.includes("name") || h.includes("user"));
+
+  if (dateIdx === -1 || amountIdx === -1 || statusIdx === -1) {
+    Logger.log("ERROR: Missing required columns for stats. Headers found: " + headers.join(","));
+    return { todayBookings: 0, totalRevenue: 0, totalUsers: 0 };
+  }
 
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   let todayCount = 0;
@@ -404,11 +433,12 @@ function calculateDashboardStats() {
     if (dStr === todayStr) todayCount++;
 
     const status = row[statusIdx] ? row[statusIdx].toString().toLowerCase() : "";
-    if (status === "success") {
+    if (status.includes("success") || status.includes("confirmed")) {
       totalRev += (parseFloat(row[amountIdx]) || 0);
     }
 
-    if (row[1]) userSet.add(row[1].toString().trim()); // Using mobile or name as unique user
+    const userId = mobileIdx !== -1 ? row[mobileIdx] : row[0];
+    if (userId) userSet.add(userId.toString().trim());
   }
 
   return {
