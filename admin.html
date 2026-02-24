@@ -4,8 +4,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Turf Master | Admin Panel</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas+Neue&display=swap"
+    <title>Turf Master | Professional Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Bebas+Neue&display=swap"
         rel="stylesheet">
     <style>
         :root {
@@ -13,8 +13,8 @@
             --accent: #ff6b35;
             --dark: #0a0f0d;
             --dark2: #111a14;
-            --dark3: #1a2e20;
-            --card: rgba(255, 255, 255, 0.04);
+            --sidebar-w: 260px;
+            --glass: rgba(255, 255, 255, 0.03);
             --border: rgba(255, 255, 255, 0.08);
             --text: #e8f5ee;
             --muted: rgba(232, 245, 238, 0.5);
@@ -33,507 +33,622 @@
             color: var(--text);
             min-height: 100vh;
             display: flex;
+            overflow: hidden;
+        }
+
+        /* ── Login Overlay ── */
+        #loginSection {
+            position: fixed;
+            inset: 0;
+            background: var(--dark);
+            z-index: 1000;
+            display: flex;
             align-items: center;
             justify-content: center;
             padding: 1.5rem;
         }
 
-        body::before {
+        #loginSection::before {
             content: '';
-            position: fixed;
+            position: absolute;
             inset: 0;
             background: radial-gradient(ellipse 80% 60% at 70% 10%, rgba(50, 255, 126, 0.06) 0%, transparent 60%);
             pointer-events: none;
         }
 
-        .panel {
-            background: var(--card);
-            backdrop-filter: blur(12px);
+        .login-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2.5rem;
+            border-radius: 24px;
+            padding: 3rem;
             width: 100%;
-            max-width: 520px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* ── Login ── */
-        #loginSection {
+            max-width: 420px;
             text-align: center;
         }
 
-        .panel-logo {
+        .login-logo {
             font-family: 'Bebas Neue', sans-serif;
-            font-size: 2.5rem;
+            font-size: 3rem;
             letter-spacing: 4px;
-            margin-bottom: 0.2rem;
-        }
-
-        .panel-logo span {
-            color: var(--primary);
-        }
-
-        .panel-sub {
-            color: var(--muted);
-            font-size: 0.8rem;
-            letter-spacing: 2px;
-            margin-bottom: 2rem;
-            text-transform: uppercase;
-        }
-
-        .field-group {
-            margin-bottom: 1rem;
-            text-align: left;
-        }
-
-        .field-group label {
-            display: block;
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--muted);
             margin-bottom: 0.5rem;
         }
 
-        .field-group input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 10px;
-            padding: 0.85rem 1rem;
-            font-family: 'Inter', sans-serif;
+        .login-logo span {
+            border-bottom: 4px solid var(--primary);
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--dark2);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: transform 0.3s;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .nav-links {
+            flex: 1;
+            padding: 0 1rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 500;
             font-size: 0.95rem;
-            outline: none;
+            cursor: pointer;
             transition: all 0.3s;
         }
 
-        .field-group input:focus {
+        .nav-item:hover,
+        .nav-item.active {
+            color: var(--text);
+            background: var(--glass);
+        }
+
+        .nav-item.active {
+            border-left: 3px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .sidebar-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+        /* ── Main Content ── */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .top-bar {
+            height: 70px;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: rgba(10, 15, 13, 0.5);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .content-area {
+            padding: 2.5rem;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ── Dashboard Cards ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+        }
+
+        .stat-value {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 2.5rem;
+            color: var(--text);
+        }
+
+        .stat-footer {
+            font-size: 0.75rem;
+            color: var(--primary);
+        }
+
+        /* ── Forms & Tables ── */
+        .section-header {
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+        }
+
+        .table-wrap {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem 1.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .search-input {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.7rem 1.2rem;
+            border-radius: 50px;
+            outline: none;
+            font-family: inherit;
+            min-width: 300px;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(50, 255, 126, 0.1);
         }
 
-        .btn-primary {
-            width: 100%;
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
-            color: white;
-            border: none;
-            padding: 0.9rem;
-            border-radius: 50px;
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 1.1rem;
-            letter-spacing: 2px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
-            margin-top: 0.5rem;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4);
-        }
-
-        .error-msg {
-            color: var(--danger);
-            font-size: 0.8rem;
-            text-align: center;
-            margin-top: 0.75rem;
-            display: none;
-        }
-
-        /* ── Dashboard ── */
-        #adminDashboard {
-            display: none;
-        }
-
-        .dash-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 2rem;
-        }
-
-        .dash-title {
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 1.8rem;
-            letter-spacing: 3px;
-        }
-
-        .dash-title span {
-            color: var(--primary);
-        }
-
-        .btn-logout {
-            background: none;
+        /* ── UI Elements ── */
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
             border: 1px solid var(--border);
-            color: var(--muted);
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-logout:hover {
-            border-color: var(--danger);
-            color: var(--danger);
-        }
-
-        .day-strip {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .day-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
-            transition: border-color 0.3s;
-        }
-
-        .day-row:hover {
-            border-color: rgba(50, 255, 126, 0.2);
-        }
-
-        .day-emoji {
-            font-size: 1.3rem;
-            width: 30px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .day-name {
-            font-weight: 600;
-            font-size: 0.9rem;
-            flex: 1;
-        }
-
-        .day-sub {
-            font-size: 0.7rem;
-            color: var(--muted);
-        }
-
-        .price-input-wrap {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .rupee {
-            color: var(--primary);
-            font-weight: 700;
-            font-size: 1rem;
-        }
-
-        .price-input {
-            width: 80px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid var(--border);
+            background: transparent;
             color: var(--text);
-            border-radius: 8px;
-            padding: 0.4rem 0.6rem;
-            font-size: 0.9rem;
-            font-weight: 700;
-            text-align: right;
-            outline: none;
-            font-family: 'Inter', sans-serif;
-            transition: all 0.3s;
-        }
-
-        .price-input:focus {
-            border-color: var(--primary);
-        }
-
-        .btn-save {
-            background: rgba(50, 255, 126, 0.12);
-            color: var(--primary);
-            border: 1px solid rgba(50, 255, 126, 0.25);
-            padding: 0.35rem 0.8rem;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 700;
             cursor: pointer;
+            font-weight: 500;
             transition: all 0.3s;
-            white-space: nowrap;
         }
 
-        .btn-save:hover {
-            background: var(--primary);
-            color: var(--dark);
-        }
-
-        .btn-save.saved {
-            background: var(--primary);
-            color: var(--dark);
-        }
-
-        .btn-save.error {
-            background: rgba(255, 71, 87, 0.2);
-            color: var(--danger);
-            border-color: rgba(255, 71, 87, 0.3);
-        }
-
-        .btn-save:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .dash-footer {
-            text-align: center;
-            margin-top: 1.5rem;
-        }
-
-        .dash-footer a {
-            color: var(--muted);
-            font-size: 0.8rem;
-            text-decoration: none;
-            transition: color 0.3s;
-        }
-
-        .dash-footer a:hover {
+        .btn-action:hover {
+            border-color: var(--primary);
             color: var(--primary);
         }
 
-        .loading-row {
-            text-align: center;
-            padding: 2rem;
-            color: var(--muted);
-            font-size: 0.85rem;
+        .badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
         }
 
-        .loading-dot {
-            display: inline-block;
-            animation: spin 1s linear infinite;
+        .badge-success {
+            background: rgba(50, 255, 126, 0.15);
+            color: var(--primary);
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+        .badge-pending {
+            background: rgba(255, 171, 0, 0.15);
+            color: #ffab00;
+        }
+
+        /* ── Specific Overlays ── */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 15, 13, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 1000;
+                transform: translateX(-100%);
             }
-        }
 
-        /* ── Attempts lock ── */
-        .attempts-bar {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 1rem;
-        }
-
-        .attempt-dot {
-            height: 4px;
-            flex: 1;
-            border-radius: 2px;
-            background: var(--border);
-            transition: background 0.3s;
-        }
-
-        .attempt-dot.used {
-            background: var(--danger);
+            .sidebar.active {
+                transform: translateX(0);
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <!-- LOGIN -->
-    <div class="panel" id="loginSection">
-        <div class="panel-logo">TURF <span>ADMIN</span></div>
-        <div class="panel-sub">Authorized Personnel Only</div>
+    <!-- ── LOGIN ── -->
+    <div id="loginSection">
+        <div class="login-card">
+            <div class="login-logo">TURF <span>MASTER</span></div>
+            <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 2.5rem; letter-spacing: 2px;">ADMINISTRATOR
+                ACCESS</p>
 
-        <div class="attempts-bar" id="attemptsBar">
-            <div class="attempt-dot"></div>
-            <div class="attempt-dot"></div>
-            <div class="attempt-dot"></div>
-        </div>
-
-        <div class="field-group">
-            <label>Username</label>
-            <input type="text" id="username" placeholder="admin" onkeydown="if(event.key==='Enter') login()" />
-        </div>
-        <div class="field-group">
-            <label>Password</label>
-            <input type="password" id="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') login()" />
-        </div>
-        <button class="btn-primary" onclick="login()">ENTER DASHBOARD →</button>
-        <div class="error-msg" id="loginError">⚠ Invalid credentials. Try again.</div>
-        <div style="text-align:center; margin-top:1.5rem;">
-            <a href="index.html" style="color:var(--muted);font-size:0.75rem;text-decoration:none;">← Back to
-                Booking</a>
-        </div>
-    </div>
-
-    <!-- DASHBOARD -->
-    <div class="panel" id="adminDashboard">
-        <div class="dash-header">
-            <div>
-                <div class="dash-title">PRICE <span>DESK</span></div>
-                <div style="font-size:0.7rem; color:var(--muted); letter-spacing:1px;">Set prices per day of week</div>
+            <div style="text-align: left; margin-bottom: 1.5rem;">
+                <label
+                    style="font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Username</label>
+                <input type="text" id="username" placeholder="admin"
+                    style="width: 100%; padding: 1rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; color: white; outline: none;"
+                    onkeydown="if(event.key==='Enter') login()" />
             </div>
-            <button class="btn-logout" onclick="logout()">⏏ Logout</button>
-        </div>
 
-        <div id="pricingTable" class="day-strip">
-            <div class="loading-row"><span class="loading-dot">⏳</span> Loading prices...</div>
-        </div>
+            <div style="text-align: left; margin-bottom: 2rem;">
+                <label
+                    style="font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; display: block; margin-bottom: 0.5rem;">Password</label>
+                <input type="password" id="password" placeholder="••••••••"
+                    style="width: 100%; padding: 1rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; color: white; outline: none;"
+                    onkeydown="if(event.key==='Enter') login()" />
+            </div>
 
-        <div class="dash-footer">
-            <a href="index.html">← View Booking Page</a>
+            <button onclick="login()"
+                style="width: 100%; padding: 1.2rem; background: var(--primary); color: var(--dark); border: none; border-radius: 50px; font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; cursor: pointer; transition: 0.3s;">UNLOCK
+                DASHBOARD →</button>
+            <p id="loginError" style="color: var(--danger); font-size: 0.8rem; margin-top: 1rem; display: none;">⚠
+                Invalid credentials.</p>
         </div>
     </div>
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">TURF ADMIN</div>
+        <nav class="nav-links">
+            <div class="nav-item active" onclick="showSection('overview')">
+                <span>🏠</span> Overview
+            </div>
+            <div class="nav-item" onclick="showSection('registrations')">
+                <span>👤</span> People Registered
+            </div>
+            <div class="nav-item" onclick="showSection('pricing')">
+                <span>💰</span> Pricing Desk
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button onclick="logout()" class="btn-action"
+                style="width: 100%; color: var(--danger); border-color: rgba(255,71,87,0.2);">⏏ Sign Out</button>
+        </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ── -->
+    <main class="main-content">
+        <header class="top-bar">
+            <button class="btn-action" id="menuToggle" style="padding: 0.5rem; display: none;">☰</button>
+            <div style="font-size: 0.9rem; font-weight: 500;">Welcome, <span style="color: var(--primary);">Boss</span>
+            </div>
+            <div id="systemIndicator"
+                style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; color: var(--muted);">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary);"></span>
+                SYSTEM ACTIVE
+            </div>
+        </header>
+
+        <div class="content-area">
+
+            <!-- OVERVIEW SECTION -->
+            <section id="section_overview">
+                <div class="section-header">
+                    <h2 class="section-title">DASHBOARD <span>OVERVIEW</span></h2>
+                    <button onclick="loadDashboardStats()" class="btn-action">↻ Refresh Data</button>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Today's Bookings</span>
+                        <div class="stat-value" id="stat_today">...</div>
+                        <span class="stat-footer">Daily activity</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Revenue</span>
+                        <div class="stat-value" id="stat_revenue">...</div>
+                        <span class="stat-footer">Lifetime earnings</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Clients</span>
+                        <div class="stat-value" id="stat_users">...</div>
+                        <span class="stat-footer">Unique customers</span>
+                    </div>
+                </div>
+
+                <div class="stat-card" style="margin-top: 2rem; border-color: rgba(50, 255, 126, 0.15);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <span class="stat-label">Drive Folder Connection</span>
+                            <div id="folderStatus" style="font-size: 1.2rem; font-weight: 600; margin-top: 0.5rem;">
+                                Checking connection...</div>
+                        </div>
+                        <button onclick="checkDriveAccess()" class="btn-action" style="font-size: 0.7rem;">Validate
+                            Access</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REGISTRATIONS SECTION -->
+            <section id="section_registrations" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">PEOPLE <span>REGISTERED</span></h2>
+                    <input type="text" id="regSearch" placeholder="Search name or mobile..." class="search-input"
+                        oninput="filterRegistrations()" />
+                </div>
+
+                <div style="margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--muted); font-weight: 700;">FILTER BY DATE</label>
+                        <input type="date" id="regFilterDate" onchange="loadRegistrations()"
+                            style="padding: 0.7rem; background: var(--glass); border: 1px solid var(--border); border-radius: 8px; color: white; outline: none;" />
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table id="regTable">
+                        <thead>
+                            <tr>
+                                <th>Client Name</th>
+                                <th>Mobile</th>
+                                <th>Age</th>
+                                <th>Slots Booked</th>
+                                <th>Payment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="regTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 4rem; color: var(--muted);">Select a
+                                    date above to load data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- PRICING SECTION -->
+            <section id="section_pricing" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">PRICING <span>DESK</span></h2>
+                    <p style="color: var(--muted); font-size: 0.8rem;">Adjust slot rates for specific days</p>
+                </div>
+                <div id="pricingTable" style="display: grid; gap: 1rem;">
+                    <p class="loading-row">Loading pricing data...</p>
+                </div>
+            </section>
+
+        </div>
+    </main>
 
     <script src="script.js"></script>
     <script>
         const SESSION_KEY = "turf_admin_session";
-        const MAX_ATTEMPTS = 3;
-        let failedAttempts = 0;
+        let allRegistrations = [];
 
-        const DAYS = [
-            { key: "monday", label: "Monday", emoji: "😴" },
-            { key: "tuesday", label: "Tuesday", emoji: "💪" },
-            { key: "wednesday", label: "Wednesday", emoji: "⚡" },
-            { key: "thursday", label: "Thursday", emoji: "🔥" },
-            { key: "friday", label: "Friday", emoji: "🎉" },
-            { key: "saturday", label: "Saturday", emoji: "🏆" },
-            { key: "sunday", label: "Sunday", emoji: "☀️" }
-        ];
-
-        // ── Session Check on Load ──
+        // ── Session & Init ──
         window.onload = function () {
             if (sessionStorage.getItem(SESSION_KEY) === "true") {
                 showDashboard();
             }
         };
 
-        // ── Login ──
-        function login() {
-            if (failedAttempts >= MAX_ATTEMPTS) {
-                document.getElementById("loginError").innerText = "🔒 Too many attempts. Refresh to try again.";
-                document.getElementById("loginError").style.display = "block";
+        function showDashboard() {
+            document.getElementById("loginSection").style.display = "none";
+            loadDashboardStats();
+            checkDriveAccess();
+        }
+
+        // ── Navigation ──
+        function showSection(id) {
+            document.querySelectorAll('section').forEach(s => s.style.display = 'none');
+            document.getElementById(`section_${id}`).style.display = 'block';
+
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.querySelector(`.nav-item[onclick*="${id}"]`).classList.add('active');
+
+            if (id === 'pricing') loadPrices();
+            if (id === 'overview') loadDashboardStats();
+        }
+
+        // ── Stats & Drive Check ──
+        async function loadDashboardStats() {
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=fetchDashboardStats`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data.status === "success") {
+                    document.getElementById("stat_today").innerText = data.stats.todayBookings;
+                    document.getElementById("stat_revenue").innerText = "₹" + data.stats.totalRevenue.toLocaleString();
+                    document.getElementById("stat_users").innerText = data.stats.totalUsers;
+                }
+            } catch (e) { console.error("Stats Error:", e); }
+        }
+
+        async function checkDriveAccess() {
+            const el = document.getElementById("folderStatus");
+            el.innerText = "🔍 Checking folder...";
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=checkDriveFolder`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data.status === "success") {
+                    el.innerHTML = `✅ Linked to: <span style="color: var(--primary)">${data.folderName}</span>`;
+                } else {
+                    el.innerHTML = `❌ <span style="color: var(--danger)">${data.message}</span>`;
+                }
+            } catch (e) { el.innerText = "❌ Connection failed"; }
+        }
+
+        // ── Registrations ──
+        async function loadRegistrations() {
+            const date = document.getElementById('regFilterDate').value;
+            const tbody = document.getElementById('regTableBody');
+            if (!date) return;
+
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem;">Syncing from sheet...</td></tr>`;
+
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=fetchRegistrations&date=${date}`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data.status === "success") {
+                    allRegistrations = data.registrations;
+                    renderRegistrations(allRegistrations);
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem; color: var(--danger);">Connection error.</td></tr>`;
+            }
+        }
+
+        function filterRegistrations() {
+            const q = document.getElementById('regSearch').value.toLowerCase();
+            const filtered = allRegistrations.filter(r =>
+                r.name.toLowerCase().includes(q) ||
+                r.mobile.toString().includes(q)
+            );
+            renderRegistrations(filtered);
+        }
+
+        function renderRegistrations(list) {
+            const tbody = document.getElementById('regTableBody');
+            if (!list || list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 4rem; color: var(--muted);">No matches found.</td></tr>`;
                 return;
             }
+            tbody.innerHTML = list.map(reg => `
+                <tr>
+                    <td><div style="font-weight: 600;">${reg.name}</div></td>
+                    <td><span style="color: var(--muted); font-family: monospace;">${reg.mobile}</span></td>
+                    <td>${reg.age}</td>
+                    <td style="font-size: 0.8rem; line-height: 1.4; color: var(--muted);">${reg.slots}</td>
+                    <td><span class="badge ${reg.status.toLowerCase() === 'success' ? 'badge-success' : 'badge-pending'}">${reg.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // ── Pricing Logic (Same as before but with better UI) ──
+        async function loadPrices() {
+            const table = document.getElementById("pricingTable");
+            table.innerHTML = '<p class="loading-row">Reaching pricing service...</p>';
+            try {
+                const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
+                const data = await res.json();
+                if (data.status === "success") {
+                    const pricing = {};
+                    Object.keys(data.pricing).forEach(k => { pricing[k.toLowerCase()] = data.pricing[k]; });
+
+                    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+                    table.innerHTML = days.map(d => {
+                        const price = pricing[d] || 500;
+                        return `
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem; background: var(--glass); border: 1px solid var(--border); border-radius: 12px;">
+                                <div style="text-transform: capitalize; font-weight: 600;">${d}</div>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <span style="color: var(--primary); font-weight: 700;">₹</span>
+                                    <input type="number" id="price_${d}" value="${price}" style="width: 100px; padding: 0.5rem; background: var(--dark); border: 1px solid var(--border); border-radius: 6px; color: white; text-align: right;" />
+                                    <button class="btn-action" onclick="savePrice('${d}')" id="btn_${d}">Update</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (e) { table.innerHTML = '<p>Error loading pricing.</p>'; }
+        }
+
+        async function savePrice(dayKey) {
+            const btn = document.getElementById(`btn_${dayKey}`);
+            const price = document.getElementById(`price_${dayKey}`).value;
+            btn.innerText = "⏳";
+            try {
+                const res = await fetch(SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "updatePricing", day: dayKey, price: price }),
+                    redirect: "follow"
+                });
+                const result = await res.json();
+                btn.innerText = result.status === "success" ? "✓ Done" : "❌ Err";
+                setTimeout(() => btn.innerText = "Update", 2000);
+            } catch (e) { btn.innerText = "❌ Err"; }
+        }
+
+        // ── Auth ──
+        function login() {
             const u = document.getElementById("username").value.trim();
             const p = document.getElementById("password").value;
             if (u === ADMIN_USERNAME && p === ADMIN_PASSWORD) {
                 sessionStorage.setItem(SESSION_KEY, "true");
                 showDashboard();
             } else {
-                failedAttempts++;
-                updateAttemptDots();
-                const errEl = document.getElementById("loginError");
-                errEl.innerText = `⚠ Invalid credentials. ${MAX_ATTEMPTS - failedAttempts} attempt(s) left.`;
-                errEl.style.display = "block";
-                document.getElementById("password").value = "";
-                document.getElementById("password").focus();
+                document.getElementById("loginError").style.display = "block";
             }
         }
 
-        function updateAttemptDots() {
-            const dots = document.querySelectorAll(".attempt-dot");
-            dots.forEach((d, i) => {
-                if (i < failedAttempts) d.classList.add("used"); else d.classList.remove("used");
-            });
-        }
-
-        // ── Logout ──
         function logout() {
             sessionStorage.removeItem(SESSION_KEY);
             location.reload();
-        }
-
-        // ── Show Dashboard ──
-        function showDashboard() {
-            document.getElementById("loginSection").style.display = "none";
-            document.getElementById("adminDashboard").style.display = "block";
-            loadPrices();
-        }
-
-        // ── Load Prices ──
-        async function loadPrices() {
-            const table = document.getElementById("pricingTable");
-            if (typeof SCRIPT_URL === 'undefined') {
-                table.innerHTML = `<div class="loading-row" style="color:var(--danger)">❌ Config Error: SCRIPT_URL missing.</div>`;
-                return;
-            }
-            try {
-                const res = await fetch(`${SCRIPT_URL}?action=fetchPricing`, { redirect: 'follow' });
-                const data = await res.json();
-                console.log("Admin: fetchPricing raw:", data);
-                if (data.status === "success" && data.pricing) {
-                    // ✅ Normalize keys - works with old ('Monday') & new ('monday') backend
-                    const normalized = {};
-                    Object.keys(data.pricing).forEach(k => {
-                        normalized[k.toLowerCase()] = data.pricing[k];
-                    });
-                    console.log("Admin: normalized pricing:", normalized);
-                    renderPriceTable(normalized);
-                } else {
-                    table.innerHTML = `<div class="loading-row" style="color:var(--danger)">❌ Failed: ${data.message || "Unknown"}</div>`;
-                }
-            } catch (e) {
-                console.error("Admin: loadPrices error:", e);
-                table.innerHTML = `<div class="loading-row" style="color:var(--danger)">❌ Connection error. Check console.</div>`;
-            }
-        }
-
-        function renderPriceTable(pricing) {
-            const table = document.getElementById("pricingTable");
-            table.innerHTML = "";
-            DAYS.forEach(({ key, label, emoji }) => {
-                const price = pricing[key] !== undefined ? pricing[key] : 500;
-                const row = document.createElement("div");
-                row.className = "day-row";
-                row.innerHTML = `
-          <span class="day-emoji">${emoji}</span>
-          <div style="flex:1;">
-            <div class="day-name">${label}</div>
-          </div>
-          <div class="price-input-wrap">
-            <span class="rupee">₹</span>
-            <input class="price-input" type="number" id="price_${key}" value="${price}" min="0" />
-            <button class="btn-save" id="btn_${key}" onclick="savePrice('${key}')">Save</button>
-          </div>
-        `;
-                table.appendChild(row);
-            });
-        }
-
-        // ── Save Price ──
-        async function savePrice(dayKey) {
-            const btn = document.getElementById(`btn_${dayKey}`);
-            const price = document.getElementById(`price_${dayKey}`).value;
-            btn.innerText = "...";
-            btn.disabled = true;
-            try {
-                const res = await fetch(SCRIPT_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
-                    body: JSON.stringify({ action: "updatePricing", day: dayKey, price: price }),
-                    redirect: "follow"
-                });
-                const result = await res.json();
-                if (result.status === "success") {
-                    btn.innerText = "✓ Saved";
-                    btn.classList.add("saved");
-                    setTimeout(() => { btn.innerText = "Save"; btn.classList.remove("saved"); btn.disabled = false; }, 2000);
-                } else {
-                    btn.innerText = "Error";
-                    btn.classList.add("error");
-                    setTimeout(() => { btn.innerText = "Save"; btn.classList.remove("error"); btn.disabled = false; }, 2000);
-                }
-            } catch (e) {
-                btn.innerText = "Error";
-                btn.classList.add("error");
-                setTimeout(() => { btn.innerText = "Save"; btn.classList.remove("error"); btn.disabled = false; }, 2000);
-            }
         }
     </script>
 </body>

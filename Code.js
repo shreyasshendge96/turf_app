@@ -42,7 +42,45 @@ function doGet(e) {
       });
     }
 
-    // 3. Availability Check
+    // 3. Fetch Registrations (Reads from Sheet1 filtered by date)
+    if (action === "fetchRegistrations") {
+      const targetDate = e.parameter.date;
+      if (!targetDate) return createJsonResponse({ status: "error", message: "Date required" });
+
+      const registrations = scanSheetForRegistrations(targetDate);
+      return createJsonResponse({
+        status: "success",
+        registrations: registrations
+      });
+    }
+
+    // 4. Fetch Dashboard Stats
+    if (action === "fetchDashboardStats") {
+      const stats = calculateDashboardStats();
+      return createJsonResponse({
+        status: "success",
+        stats: stats
+      });
+    }
+
+    // 5. Check Drive Folder Access
+    if (action === "checkDriveFolder") {
+      try {
+        const folder = DriveApp.getFolderById(FOLDER_ID);
+        return createJsonResponse({
+          status: "success",
+          folderName: folder.getName(),
+          message: "Access verified!"
+        });
+      } catch (e) {
+        return createJsonResponse({
+          status: "error",
+          message: "Cannot access folder: " + e.toString()
+        });
+      }
+    }
+
+    // 6. Availability Check
     const date = e.parameter.date;
     if (!date) return createJsonResponse({ status: "error", message: "Date required" });
 
@@ -240,21 +278,6 @@ function handleVerifyAndSave(data) {
   return createJsonResponse({ status: "success", message: "Confirmed!" });
 }
 
-function saveToSpecificFolder(base64Data, fileName) {
-  try {
-    // Auto-detect content type from base64 string
-    const contentType = base64Data.substring(5, base64Data.indexOf(';'));
-    const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
-    const blob = Utilities.newBlob(bytes, contentType, fileName);
-    const folder = DriveApp.getFolderById(FOLDER_ID);
-    const file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
-  } catch (e) {
-    return "Error saving photo: " + e.toString();
-  }
-}
-
 function scanSheetForBookedSlots(date, sheet) {
   // Defensive check for manual execution in IDE
   if (!date || !sheet) {
@@ -318,4 +341,111 @@ function testFetchPricing() {
   });
   Logger.log("Pricing (lowercase keys): " + JSON.stringify(pricing));
   Logger.log("✅ If you see all 7 days above with correct prices, the backend is working fine!");
+}
+
+/**
+ * Scans the sheet for all registrations on a specific date.
+ */
+function scanSheetForRegistrations(date) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
+  const data = sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), 7).getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
+  const dateIdx = headers.findIndex(h => h.includes("date"));
+  const nameIdx = headers.findIndex(h => h.includes("name"));
+  const mobileIdx = headers.findIndex(h => h.includes("mobile"));
+  const ageIdx = headers.findIndex(h => h.includes("age"));
+  const slotIdx = headers.findIndex(h => h.includes("slot"));
+  const statusIdx = headers.findIndex(h => h.includes("status"));
+
+  if (dateIdx === -1) return [];
+
+  const results = [];
+  for (let i = 1; i < data.length; i++) {
+    let d = data[i][dateIdx];
+    let dStr = (d instanceof Date) ? Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd") : d.toString().trim();
+
+    if (dStr === date) {
+      results.push({
+        name: nameIdx !== -1 ? data[i][nameIdx] : "N/A",
+        mobile: mobileIdx !== -1 ? data[i][mobileIdx] : "N/A",
+        age: ageIdx !== -1 ? data[i][ageIdx] : "N/A",
+        slots: slotIdx !== -1 ? data[i][slotIdx] : "N/A",
+        status: statusIdx !== -1 ? data[i][statusIdx] : "N/A"
+      });
+    }
+  }
+  return results;
+}
+
+/**
+ * Calculates quick stats for the dashboard.
+ */
+function calculateDashboardStats() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
+  const data = sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), 7).getValues();
+  if (data.length < 2) return { todayBookings: 0, totalRevenue: 0, totalUsers: 0 };
+
+  const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
+  const dateIdx = headers.findIndex(h => h.includes("date"));
+  const amountIdx = headers.findIndex(h => h.includes("amount"));
+  const statusIdx = headers.findIndex(h => h.includes("status"));
+
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  let todayCount = 0;
+  let totalRev = 0;
+  const userSet = new Set();
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const dStr = (row[dateIdx] instanceof Date) ? Utilities.formatDate(row[dateIdx], Session.getScriptTimeZone(), "yyyy-MM-dd") : row[dateIdx].toString().trim();
+
+    if (dStr === todayStr) todayCount++;
+
+    const status = row[statusIdx] ? row[statusIdx].toString().toLowerCase() : "";
+    if (status === "success") {
+      totalRev += (parseFloat(row[amountIdx]) || 0);
+    }
+
+    if (row[1]) userSet.add(row[1].toString().trim()); // Using mobile or name as unique user
+  }
+
+  return {
+    todayBookings: todayCount,
+    totalRevenue: totalRev,
+    totalUsers: userSet.size
+  };
+}
+
+/**
+ * Overwritten robust image saving function.
+ */
+function saveToSpecificFolder(base64Data, fileName) {
+  try {
+    if (!base64Data || !base64Data.includes(",")) {
+      throw new Error("Invalid base64 payload received.");
+    }
+
+    // Auto-detect content type from base64 string
+    const splitData = base64Data.split(',');
+    const header = splitData[0];
+    const base64Body = splitData[1];
+    const contentType = header.substring(5, header.indexOf(';'));
+
+    const bytes = Utilities.base64Decode(base64Body);
+    const blob = Utilities.newBlob(bytes, contentType, fileName);
+
+    const folder = DriveApp.getFolderById(FOLDER_ID);
+    if (!folder) throw new Error("Folder not found or inaccessible: " + FOLDER_ID);
+
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
+  } catch (e) {
+    Logger.log("saveToSpecificFolder Error: " + e.toString());
+    // Return a descriptive error that can be stored in the sheet for debugging
+    return "UPLOAD_ERROR: " + e.message;
+  }
 }
