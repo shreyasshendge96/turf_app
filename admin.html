@@ -392,7 +392,7 @@
             <div id="systemIndicator"
                 style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; color: var(--muted);">
                 <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary);"></span>
-                SYSTEM ACTIVE
+                SYSTEM ACTIVE <span id="scriptVersion" style="margin-left: 5px; opacity: 0.5;">...</span>
             </div>
         </header>
 
@@ -401,7 +401,11 @@
             <!-- OVERVIEW SECTION -->
             <section id="section_overview">
                 <div class="section-header">
-                    <h2 class="section-title">DASHBOARD <span>OVERVIEW</span></h2>
+                    <div>
+                        <h2 class="section-title">DASHBOARD <span>OVERVIEW</span></h2>
+                        <p id="todayDateDisplay"
+                            style="font-size: 0.8rem; color: var(--primary); font-weight: 600; margin-top: 0.2rem;"></p>
+                    </div>
                     <button onclick="loadDashboardStats()" class="btn-action">↻ Refresh Data</button>
                 </div>
                 <div class="stats-grid">
@@ -411,14 +415,20 @@
                         <span class="stat-footer">Daily activity</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">Total Revenue</span>
-                        <div class="stat-value" id="stat_revenue">...</div>
-                        <span class="stat-footer">Lifetime earnings</span>
+                        <span class="stat-label">Today's Revenue</span>
+                        <div class="stat-value" id="stat_today_revenue">...</div>
+                        <span class="stat-footer">Earnings for today</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">Total Clients</span>
-                        <div class="stat-value" id="stat_users">...</div>
-                        <span class="stat-footer">Unique customers</span>
+                        <span class="stat-label">Slot Status</span>
+                        <div class="stat-value"
+                            style="font-size: 1.5rem; display: flex; flex-direction: column; gap: 0.2rem;">
+                            <div style="font-size: 0.8rem; color: var(--muted);">Completed: <span id="stat_completed"
+                                    style="color: var(--primary)">0</span></div>
+                            <div style="font-size: 0.8rem; color: var(--muted);">Remaining: <span id="stat_remaining"
+                                    style="color: var(--primary)">0</span></div>
+                        </div>
+                        <span class="stat-footer">Real-time tracking</span>
                     </div>
                 </div>
 
@@ -502,8 +512,12 @@
             document.getElementById("loginSection").style.display = "none";
 
             // Set default date to today for registrations
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('regFilterDate').value = today;
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            document.getElementById('regFilterDate').value = todayStr;
+
+            // Show today's date in overview
+            document.getElementById('todayDateDisplay').innerText = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
             checkScriptVersion();
             loadDashboardStats();
@@ -545,8 +559,9 @@
                 console.log("Dashboard Stats Response:", data);
                 if (data.status === "success") {
                     document.getElementById("stat_today").innerText = data.stats.todayBookings;
-                    document.getElementById("stat_revenue").innerText = "₹" + data.stats.totalRevenue.toLocaleString();
-                    document.getElementById("stat_users").innerText = data.stats.totalUsers;
+                    document.getElementById("stat_today_revenue").innerText = "₹" + data.stats.todayRevenue.toLocaleString();
+                    document.getElementById("stat_completed").innerText = data.stats.completedSlots;
+                    document.getElementById("stat_remaining").innerText = data.stats.remainingSlots;
                 } else {
                     console.error("Dashboard Stats Error:", data.message);
                 }

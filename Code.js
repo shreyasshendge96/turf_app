@@ -1,5 +1,5 @@
 const DATA_ENTRY_SHEET_NAME = "Sheet1";
-const SCRIPT_VERSION = "V20-DIAGNOSTIC";
+const SCRIPT_VERSION = "V22-REALTIME";
 const FOLDER_ID = "11_1y25b-VrUr1qNGY1_dELhyT1Ixuyk6";
 
 // RAZORPAY CREDENTIALS (TEST MODE)
@@ -403,48 +403,83 @@ function scanSheetForRegistrations(date) {
 }
 
 /**
- * Calculates quick stats for the dashboard.
+ * Calculates real-time stats for the dashboard.
  */
 function calculateDashboardStats() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_ENTRY_SHEET_NAME);
   const data = sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), 7).getValues();
-  if (data.length < 2) return { todayBookings: 0, totalRevenue: 0, totalUsers: 0 };
+
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const currentHr = new Date().getHours();
+
+  if (data.length < 2) {
+    return {
+      todayBookings: 0,
+      todayRevenue: 0,
+      completedSlots: 0,
+      remainingSlots: 24 - (currentHr + 1)
+    };
+  }
 
   const headers = data[0].map(h => h.toString().trim().toLowerCase().replace(/_/g, ""));
   const dateIdx = headers.findIndex(h => h.includes("date"));
   const amountIdx = headers.findIndex(h => h.includes("amount") || h.includes("total") || h.includes("price"));
   const statusIdx = headers.findIndex(h => h.includes("status") || h.includes("payment"));
-  const mobileIdx = headers.findIndex(h => h.includes("mobile") || h.includes("phone") || h.includes("name") || h.includes("user"));
+  const slotIdx = headers.findIndex(h => h.includes("slot") || h.includes("time"));
 
-  if (dateIdx === -1 || amountIdx === -1 || statusIdx === -1) {
-    Logger.log("ERROR: Missing required columns for stats. Headers found: " + headers.join(","));
-    return { todayBookings: 0, totalRevenue: 0, totalUsers: 0 };
+  if (dateIdx === -1 || slotIdx === -1) {
+    return { todayBookings: 0, todayRevenue: 0, completedSlots: 0, remainingSlots: 0 };
   }
 
-  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   let todayCount = 0;
-  let totalRev = 0;
-  const userSet = new Set();
+  let todayRev = 0;
+  let bookedSlotsForToday = [];
 
   for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const dStr = (row[dateIdx] instanceof Date) ? Utilities.formatDate(row[dateIdx], Session.getScriptTimeZone(), "yyyy-MM-dd") : row[dateIdx].toString().trim();
+    const dStr = parseDateToString(data[i][dateIdx]);
 
-    if (dStr === todayStr) todayCount++;
+    if (dStr === todayStr) {
+      todayCount++;
+      const row = data[i];
+      const status = row[statusIdx] ? row[statusIdx].toString().toLowerCase() : "";
+      if (status.includes("success") || status.includes("confirmed")) {
+        todayRev += (parseFloat(row[amountIdx]) || 0);
+      }
 
-    const status = row[statusIdx] ? row[statusIdx].toString().toLowerCase() : "";
-    if (status.includes("success") || status.includes("confirmed")) {
-      totalRev += (parseFloat(row[amountIdx]) || 0);
+      // Collect booked slots to calculate "Remaining"
+      const slots = data[i][slotIdx].toString().split(",");
+      slots.forEach(s => { if (s.trim()) bookedSlotsForToday.push(s.trim()); });
     }
-
-    const userId = mobileIdx !== -1 ? row[mobileIdx] : row[0];
-    if (userId) userSet.add(userId.toString().trim());
   }
+
+  // Calculate Real-time status
+  // A slot is "Completed" if its end hour is <= current hour
+  // We assume slots are like "09 AM - 10 AM" (extracted hour is 9, end hour is 10)
+  let completedCount = 0;
+  bookedSlotsForToday.forEach(slot => {
+    // Slot format: "HH AM/PM - HH AM/PM"
+    const parts = slot.split("-");
+    if (parts.length > 1) {
+      let endPart = parts[1].trim(); // e.g. "10 AM"
+      let hr = parseInt(endPart);
+      let isPM = endPart.includes("PM");
+      if (isPM && hr < 12) hr += 12;
+      if (!isPM && hr === 12) hr = 0; // 12 AM is 0
+      if (hr === 12 && endPart.includes("AM")) hr = 24; // Handle literal "12 AM" at end of day if exists
+
+      if (hr <= currentHr) completedCount++;
+    }
+  });
+
+  const totalPossibleToday = 24;
+  const pastHours = currentHr + 1;
+  const remainingSlots = Math.max(0, totalPossibleToday - pastHours - (bookedSlotsForToday.length - completedCount));
 
   return {
     todayBookings: todayCount,
-    totalRevenue: totalRev,
-    totalUsers: userSet.size
+    todayRevenue: todayRev,
+    completedSlots: completedCount,
+    remainingSlots: remainingSlots
   };
 }
 
