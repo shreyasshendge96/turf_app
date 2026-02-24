@@ -557,13 +557,18 @@
                 const res = await fetch(`${SCRIPT_URL}?action=fetchDashboardStats`, { redirect: 'follow' });
                 const data = await res.json();
                 console.log("Dashboard Stats Response:", data);
-                if (data.status === "success") {
-                    document.getElementById("stat_today").innerText = data.stats.todayBookings;
-                    document.getElementById("stat_today_revenue").innerText = "₹" + data.stats.todayRevenue.toLocaleString();
-                    document.getElementById("stat_completed").innerText = data.stats.completedSlots;
-                    document.getElementById("stat_remaining").innerText = data.stats.remainingSlots;
+                if (data.status === "success" && data.stats) {
+                    const stats = data.stats;
+                    document.getElementById("stat_today").innerText = stats.todayBookings ?? 0;
+
+                    // Defensive check: use totalRevenue if todayRevenue is missing (for older script versions)
+                    const rev = stats.todayRevenue ?? stats.totalRevenue ?? 0;
+                    document.getElementById("stat_today_revenue").innerText = "₹" + rev.toLocaleString();
+
+                    document.getElementById("stat_completed").innerText = stats.completedSlots ?? 0;
+                    document.getElementById("stat_remaining").innerText = stats.remainingSlots ?? 0;
                 } else {
-                    console.error("Dashboard Stats Error:", data.message);
+                    console.error("Dashboard Stats Error:", data?.message);
                 }
             } catch (e) { console.error("Stats Fetch Failed:", e); }
         }

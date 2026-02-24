@@ -2,7 +2,7 @@
  * --- CONFIGURATION ---
  * Paste your Google Apps Script Web App URL here
  */
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyxeJEfc86KMAHUBs56DC1ocLW1n0qC8hKWD8Ie1tMMNmzkHkWlpZRHp2Hcd-b29J44/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyKV5LUD5m4PbgGIiTDpXgU6aqRD3vH-Vd-Pechw3mz1-ZF1suVctmECiTBopXL5ai25Q/exec";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "turf123";
 
